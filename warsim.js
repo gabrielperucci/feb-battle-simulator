@@ -74,12 +74,12 @@ const MAX_SKILL_LEVEL = 10;
 const MIN_SKILL_LEVEL = 0;
 
 const rarityCostsDefaults = {
-    gray: 2,
-    green: 6,
+    gray: 1.5,
+    green: 5,
     blue: 20,
-    purple: 70,
-    yellow: 200,
-    red: 600
+    purple: 57,
+    yellow: 160,
+    red: 440
 };
 
 const scrapPerRarity = {
@@ -2166,40 +2166,36 @@ function getRarityFromStats(itemType, value1, value2) {
     if (itemType === 'weapon') {
         const attack = value1 || 0;
         const crit = value2 || 0;
-
         if (attack >= 221 && crit >= 41) return 'red';
         else if (attack >= 141 && crit >= 26) return 'yellow';
         else if (attack >= 101 && crit >= 16) return 'purple';
-        else if (attack >= 71 && crit >= 11) return 'blue';
-        else if (attack >= 51 && crit >= 6) return 'green';
+        else if (attack >= 71  && crit >= 11) return 'blue';
+        else if (attack >= 51  && crit >= 6)  return 'green';
         else return 'gray';
     } else if (itemType === 'helmet') {
-        const value = value1 || 0;
-
-        if (value >= 121) return 'red';
-        else if (value >= 91) return 'yellow';
-        else if (value >= 71) return 'purple';
-        else if (value >= 31) return 'blue';
-        else if (value >= 16) return 'green';
+        const v = value1 || 0;
+        if (v >= 121) return 'red';
+        else if (v >= 91) return 'yellow';
+        else if (v >= 71) return 'purple';
+        else if (v >= 31) return 'blue';
+        else if (v >= 16) return 'green';
         else return 'gray';
     } else if (itemType === 'chest' || itemType === 'pants') {
-        const value = value1 || 0;
-
-        if (value >= 56) return 'red';
-        else if (value >= 36) return 'yellow';
-        else if (value >= 21) return 'purple';
-        else if (value >= 11) return 'blue';
-        else if (value >= 6) return 'green';
+        const v = value1 || 0;
+        if (v >= 56) return 'red';
+        else if (v >= 36) return 'yellow';
+        else if (v >= 21) return 'purple';
+        else if (v >= 11) return 'blue';
+        else if (v >= 6)  return 'green';
         else return 'gray';
     } else {
-        // Other armors (boots, gloves)
-        const value = value1 || 0;
-
-        if (value >= 51) return 'red';
-        else if (value >= 31) return 'yellow';
-        else if (value >= 21) return 'purple';
-        else if (value >= 11) return 'blue';
-        else if (value >= 6) return 'green';
+        // boots, gloves
+        const v = value1 || 0;
+        if (v >= 51) return 'red';
+        else if (v >= 31) return 'yellow';
+        else if (v >= 21) return 'purple';
+        else if (v >= 11) return 'blue';
+        else if (v >= 6)  return 'green';
         else return 'gray';
     }
 }
@@ -2455,13 +2451,9 @@ function init() {
         };
     }
     
-    // Initialize rarity costs if not present
-    if (!state.weaponRarityCosts) {
-        state.weaponRarityCosts = { ...rarityCostsDefaults };
-    }
-    if (!state.armorRarityCosts) {
-        state.armorRarityCosts = { ...rarityCostsDefaults };
-    }
+    // Always sync rarity costs to current defaults (overrides stale localStorage values)
+    state.weaponRarityCosts = { ...rarityCostsDefaults };
+    state.armorRarityCosts  = { ...rarityCostsDefaults };
 
     // Always calculate costs based on current equipment stats and saved rarity costs
     const weaponRarity = getRarityFromStats('weapon', state.weapon.primary, state.weapon.secondary);
