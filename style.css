@@ -2791,23 +2791,35 @@ body {
         flex-wrap: wrap;
         gap: 6px;
     }
-    /* Weapon cards scroll horizontally instead of overflow */
+    /* Weapons: 3 per row grid */
     #weaponList {
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        padding-bottom: 4px;
-        max-width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        flex-wrap: unset;
+        overflow-x: unset;
     }
     .ms-weapon-card {
-        min-width: 56px;
-        flex-shrink: 0;
+        width: 100%;
+        min-width: unset;
     }
     .ms-weapon-img {
-        width: 32px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
     }
     .ms-weapon-card-header {
         padding: 4px 3px 3px;
+    }
+    /* Armor equipment grid: 3 per row */
+    .equipment-compact-grid {
+        grid-template-columns: repeat(3, 1fr);
+        overflow-x: unset;
+    }
+    .equipment-compact-item {
+        min-width: unset;
+    }
+    .equip-img {
+        width: 36px;
+        height: 36px;
     }
     /* Clamp anything that could cause overflow */
     .equipment-compact-input-weapon-crit,

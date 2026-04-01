@@ -1,14 +1,14 @@
 'use strict';
 
 // ── Gear stat tables (representative value per rarity 0–5) ──────────────────
-const WEAPON_PRIMARY   = [40,  60,  86,  121, 181, 260];
-const WEAPON_SECONDARY = [5,   8,   13,  18,  33,  50 ];
-const HELMET_STAT      = [5,   20,  50,  80,  100, 130 ];
-const CHEST_STAT       = [3,   8,   13,  25,  40,  60  ];
-const PANTS_STAT       = [3,   8,   13,  25,  40,  60  ];
-const BOOTS_STAT       = [3,   8,   13,  25,  35,  55  ];
-const GLOVES_STAT      = [3,   8,   13,  25,  35,  55  ];
-const RARITY_COSTS     = [2,   6,   20,  70,  200, 600 ];
+const WEAPON_PRIMARY   = [30,  55,  80,  115, 155, 260]; // faca/pistola/fuzil/sniper/tank/jato (ponto médio)
+const WEAPON_SECONDARY = [3,   8,   13,  18,  30,  45 ];
+const HELMET_STAT      = [8,   23,  40,  80,  100, 135]; // (1-15)(16-30)(31-50)(71-90)(91-110)(121-150)
+const CHEST_STAT       = [3,   8,   13,  25,  43,  63 ]; // (1-5)(6-10)(11-15)(21-30)(36-50)(56-70)
+const PANTS_STAT       = [3,   8,   13,  25,  43,  63 ]; // (1-5)(6-10)(11-15)(21-30)(36-50)(56-70)
+const BOOTS_STAT       = [3,   8,   13,  23,  35,  55 ]; // (1-5)(6-10)(11-15)(21-25)(31-40)(51-60)
+const GLOVES_STAT      = [3,   8,   13,  23,  35,  55 ]; // (1-5)(6-10)(11-15)(21-25)(31-40)(51-60)
+const RARITY_COSTS     = [1.5, 5,   20,  57,  160, 440 ];
 const RARITY_NAMES     = ['Cinza','Verde','Azul','Roxo','Amarelo','Vermelho'];
 
 const AMMO_BONUS       = [0,  10,  20,  40 ];
@@ -196,7 +196,7 @@ function evalPhaseGear(skills, gear, ammoIdx, cfg, usePill, hp, initWDur, initAD
     const bootsC = (aDurUsed / 100) * RARITY_COSTS[bootsR];
     const glovC  = (aDurUsed / 100) * RARITY_COSTS[glovR];
     const ammoC  = nHits * AMMO_COST_HIT[ammoIdx];
-    const pillC  = usePill ? (cfg.buffCosts ? cfg.buffCosts.pill : 22) : 0;
+    const pillC  = usePill ? (cfg.buffCosts ? cfg.buffCosts.pill : 35) : 0;
 
     return {
         damage: eDmg * nHits,
