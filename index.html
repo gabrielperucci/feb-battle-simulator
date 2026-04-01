@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FEB - Battle Simulation</title>
+    <link href="style.css" rel="stylesheet" type="text/css" />
+    <link href="responsive.css" rel="stylesheet" type="text/css" />
+    <link rel="icon" type="image/png" href="assets/logo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+        <div class="top-bar-fields">
+            <div class="top-field">
+                <span class="top-field-label">LEVEL</span>
+                <div class="top-field-row">
+                    <input type="number" id="level-input" class="top-input" value="10" min="0" step="1" onchange="setLevel(parseInt(this.value) || 0)">
+                    <button class="top-btn-reset" onclick="resetSkills()">Reset</button>
+                </div>
+                <span class="top-field-sub" id="skill-points-value"></span>
+                <span id="level-value" style="display:none">10</span>
+                <button id="level-minus-btn" style="display:none"></button>
+            </div>
+            <div class="top-field-sep"></div>
+            <div class="top-field">
+                <span class="top-field-label">RANK BONUS</span>
+                <div class="top-field-row">
+                    <input type="number" id="military-rank-bonus" class="top-input" value="10" min="0" max="100" step="0.1" onchange="changeMilitaryRankBonus(parseFloat(this.value))">
+                    <span class="top-field-suffix">%</span>
+                </div>
+            </div>
+            <div class="top-field-sep"></div>
+            <div class="top-field">
+                <span class="top-field-label">BATTLE BONUS</span>
+                <div class="top-field-row">
+                    <input type="number" id="battle-bonus-direct" class="top-input" value="0" min="0" max="300" step="1" onchange="setBattleBonusDirect(parseFloat(this.value))">
+                    <span class="top-field-suffix">%</span>
+                </div>
+            </div>
+            <div class="top-field-sep"></div>
+            <div class="top-field">
+                <span class="top-field-label">COMPANIES</span>
+                <div class="top-field-row">
+                    <button class="top-btn" onclick="changeSkill('companies', -1)">-</button>
+                    <span class="top-field-value" id="companies-bonus">2</span>
+                    <button class="top-btn" onclick="changeSkill('companies', 1)">+</button>
+                </div>
+                <span class="top-field-sub" id="companies-value"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABS + BUILDS BAR -->
+    <div class="tabs-builds-bar">
+        <div class="main-tabs">
+            <div class="main-tab active" onclick="switchTab('configure')">Configure</div>
+            <div class="main-tab" onclick="switchTab('compare')">Compare</div>
+            <div class="main-tab" onclick="switchTab('optimizer')">Otimizador</div>
+        </div>
+        <div id="buildsBar" class="builds-bar">
+            <select id="buildsSelect" class="builds-select" onchange="onBuildSelect(this)">
+                <option value="">-- Select Build --</option>
+            </select>
+            <div class="builds-actions">
+                <button class="builds-btn builds-btn-save" onclick="saveBuild()">Save</button>
+                <button class="builds-btn builds-btn-create" onclick="createBuild()">New</button>
+                <button class="builds-btn builds-btn-delete" onclick="deleteBuild()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="compareBar" class="compare-controls" style="display: none;">
+        <select id="compareSelect1" class="builds-select compare-select"></select>
+        <span class="compare-vs">vs</span>
+        <select id="compareSelect2" class="builds-select compare-select"></select>
+        <button class="simulate-btn compare-run-btn" onclick="runComparison()">Run Comparison</button>
+    </div>
+
+    <!-- CONFIGURE TAB -->
+    <div id="configureTab" class="configure-layout">
+
+        <!-- LEFT PANEL -->
+        <div class="configure-left">
+
+            <!-- FIGHT SKILLS -->
+            <div class="section-header">SKILLS <span id="fight-skills-summary" class="skills-summary"></span></div>
+            <div class="skills-grid">
+
+                <div class="skill-item attack" onclick="openSkillPopover('attack', this)">
+                    <svg class="skill-icon-svg" style="color:#e05555" fill="currentColor"><use href="#skill-svg-1"></use></svg>
+                    <div class="skill-card-name">ATK</div>
+                    <div class="skill-card-bonus" id="attack-bonus"></div>
+                    <div class="skill-card-pts"><span id="attack-value">0</span> pts</div>
+                </div>
+
+                <div class="skill-item precision" onclick="openSkillPopover('precision', this)">
+                    <svg class="skill-icon-svg" style="color:#d4a820" fill="currentColor"><use href="#skill-svg-2"></use></svg>
+                    <div class="skill-card-name">PRC</div>
+                    <div class="skill-card-bonus" id="precision-bonus"></div>
+                    <div class="skill-card-pts"><span id="precision-value">0</span> pts</div>
+                </div>
+
+                <div class="skill-item crit" onclick="openSkillPopover('critChance', this)">
+                    <svg class="skill-icon-svg" style="color:#ab47bc" fill="currentColor"><use href="#skill-svg-3"></use></svg>
+                    <div class="skill-card-name">CC</div>
+                    <div class="skill-card-bonus" id="critChance-bonus"></div>
+                    <div class="skill-card-pts"><span id="critChance-value">0</span> pts</div>
+                </div>
+
+                <div class="skill-item crit" onclick="openSkillPopover('critDamage', this)">
+                    <svg class="skill-icon-svg" style="color:#ce93d8" fill="currentColor"><use href="#skill-svg-4"></use></svg>
+                    <div class="skill-card-name">CD</div>
+                    <div class="skill-card-bonus" id="critDamage-bonus"></div>
+                    <div class="skill-card-pts"><span id="critDamage-value">0</span> pts</div>
+                </div>
+
+                <div class="skill-item armor" onclick="openSkillPopover('armor', this)">
+                    <svg class="skill-icon-svg" style="color:#4caf6e" fill="currentColor"><use href="#skill-svg-5"></use></svg>
+                    <div class="skill-card-name">ARM</div>
+                    <div class="skill-card-bonus" id="armor-bonus"></div>
+                    <div class="skill-card-pts"><span id="armor-value">0</span> pts</div>
+                </div>
+
+                <div class="skill-item dodge" onclick="openSkillPopover('dodge', this)">
+                    <svg class="skill-icon-svg" style="color:#42a5f5" fill="currentColor"><use href="#skill-svg-6"></use></svg>
+                    <div class="skill-card-name">DDG</div>
+                    <div class="skill-card-bonus" id="dodge-bonus"></div>
+                    <div class="skill-card-pts"><span id="dodge-value">0</span> pts</div>
+                </div>
+
+                <div class="skill-item health" onclick="openSkillPopover('health', this)">
+                    <svg class="skill-icon-svg" style="color:#ef5350" fill="currentColor"><use href="#skill-svg-7"></use></svg>
+                    <div class="skill-card-name">HP</div>
+                    <div class="skill-card-bonus" id="health-bonus"></div>
+                    <div class="skill-card-pts"><span id="health-value">0</span> pts</div>
+                </div>
+
+                <div class="skill-item loot" onclick="openSkillPopover('loot', this)">
+                    <svg class="skill-icon-svg" style="color:#ffee58" fill="currentColor"><use href="#skill-svg-8"></use></svg>
+                    <div class="skill-card-name">LOOT</div>
+                    <div class="skill-card-bonus" id="loot-bonus"></div>
+                    <div class="skill-card-pts"><span id="loot-value">0</span> pts</div>
+                </div>
+
+                <div class="skill-item hunger" onclick="openSkillPopover('hunger', this)">
+                    <svg class="skill-icon-svg" style="color:#a1887f" fill="currentColor"><use href="#skill-svg-9"></use></svg>
+                    <div class="skill-card-name">HNG</div>
+                    <div class="skill-card-bonus" id="hunger-bonus"></div>
+                    <div class="skill-card-pts"><span id="hunger-value">0</span> pts</div>
+                </div>
+
+            </div>
+
+            <!-- HIDDEN: GEAR (kept for JS compatibility) -->
+            <div style="display:none" aria-hidden="true">
+                <div id="weaponItem"><img id="weaponImg" src="assets/knife.png" alt="Weapon"></div>
+                <div id="weaponStatsBox"><input type="number" id="primaryWeapon" value="90"><input type="number" id="secondaryWeapon" value="15"></div>
+                <div id="weaponCostBox"><input type="number" id="weaponCost" value="30"></div>
+                <div id="helmetItem"><img id="helmetImg" src="assets/helmet.png" alt="Helmet"></div>
+                <div id="helmetStatsBox"><input type="number" id="helmet" value="15" onchange="updateEquipmentRarity('helmet')"></div>
+                <div id="helmetCostBox"><input type="number" id="helmetCost" value="30"></div>
+                <div id="chestItem"></div><div id="chestStatsBox"><input type="number" id="chest" value="15" onchange="updateEquipmentRarity('chest')"></div><div id="chestCostBox"><input type="number" id="chestCost" value="30"></div>
+                <div id="pantsItem"></div><div id="pantsStatsBox"><input type="number" id="pants" value="15" onchange="updateEquipmentRarity('pants')"></div><div id="pantsCostBox"><input type="number" id="pantsCost" value="30"></div>
+                <div id="bootsItem"></div><div id="bootsStatsBox"><input type="number" id="boots" value="15" onchange="updateEquipmentRarity('boots')"></div><div id="bootsCostBox"><input type="number" id="bootsCost" value="30"></div>
+                <div id="glovesItem"></div><div id="glovesStatsBox"><input type="number" id="gloves" value="15" onchange="updateEquipmentRarity('gloves')"></div><div id="glovesCostBox"><input type="number" id="glovesCost" value="30"></div>
+            </div>
+
+            <!-- HIDDEN: CONSUMABLES (kept for JS compatibility) -->
+            <div style="display:none" aria-hidden="true">
+                <div id="buffPill"></div><div id="buffPillStatsBox"></div><input type="number" id="pillCost" value="22.00">
+                <div id="buffLight"></div><div id="buffLightStatsBox"></div><input type="number" id="lightAmmoCost" value="0.12">
+                <div id="buffAmmo"></div><div id="buffAmmoStatsBox"></div><input type="number" id="ammoCost" value="0.46">
+                <div id="buffHeavy"></div><div id="buffHeavyStatsBox"></div><input type="number" id="heavyAmmoCost" value="1.94">
+                <div id="buffBread"></div><div id="buffBreadStatsBox"></div><input type="number" id="breadCost" value="0.90">
+                <div id="buffSteak"></div><div id="buffSteakStatsBox"></div><input type="number" id="steakCost" value="2.00">
+                <div id="buffFish"></div><div id="buffFishStatsBox"></div><input type="number" id="fishCost" value="4.50">
+            </div>
+
+            <!-- MULTI-STAGE LOADOUTS (always visible) -->
+            <div id="multiStageSection">
+                <div class="section-header">LOADOUTS</div>
+                <div class="ms-pipeline-header">Weapons</div>
+                <div id="weaponList"></div>
+                <div class="ms-pipeline-header">Armor Loadouts</div>
+                <div id="loadoutList"></div>
+                <div class="ms-pipeline-header">Visão Geral das Fases</div>
+                <div id="stagePipeline"></div>
+            </div>
+
+            <!-- BATTLE SETTINGS -->
+            <div class="section-header">BATTLE SETTINGS</div>
+            <div class="battle-settings-panel">
+                <div class="settings-columns">
+                    <div class="settings-col">
+                        <div class="radio-compact">
+                            <input type="radio" id="singleSim" name="simType" value="single" checked>
+                            <label for="singleSim">Single battle</label>
+                        </div>
+                        <div class="radio-compact">
+                            <input type="radio" id="multipleSim" name="simType" value="multiple">
+                            <label for="multipleSim">Average of</label>
+                            <input type="number" id="battleCount" class="control-input-inline" value="10000">
+                            <label for="multipleSim">battles</label>
+                        </div>
+                        <div class="radio-compact">
+                            <input type="checkbox" id="showCombatLog" name="showCombatLog">
+                            <label for="showCombatLog">Show combat log</label>
+                        </div>
+                        <div class="radio-compact">
+                            <input type="checkbox" id="prePillPhaseEnabled" name="prePillPhaseEnabled">
+                            <label for="prePillPhaseEnabled">Pre-pill hits for</label>
+                            <input type="number" id="prePillPhaseHours" class="control-input-inline" value="6" min="0" max="16" step="0.5" style="width: 44px;">
+                            <label for="prePillPhaseEnabled">hrs</label>
+                        </div>
+                        <div class="radio-compact" style="display:none" aria-hidden="true">
+                            <input type="checkbox" id="multiStageEnabled" name="multiStageEnabled" onchange="toggleMultiStage(this.checked)">
+                            <label for="multiStageEnabled">Multi-stage loadouts</label>
+                        </div>
+                    </div>
+                    <div class="settings-col">
+                        <div class="radio-compact">
+                            <input type="checkbox" id="weaponDurabilityLimit" name="durabilityLimit">
+                            <label for="weaponDurabilityLimit">Limit weapon 100 dur.</label>
+                        </div>
+                        <div class="radio-compact">
+                            <input type="checkbox" id="armorDurabilityLimit" name="durabilityLimit">
+                            <label for="armorDurabilityLimit">Limit armor 100 dur.</label>
+                        </div>
+                        <div class="radio-compact">
+                            <input type="checkbox" id="bountyEnabled" name="bountyEnabled">
+                            <label for="bountyEnabled">Bounty</label>
+                            <div class="input-with-suffix">
+                                <input type="number" id="bountyPerKDamage" class="control-input-inline" value="0.5" min="0" max="2" step="0.1" style="width: 44px;">
+                                <span class="input-suffix">cc</span>
+                            </div>
+                        </div>
+                        <div class="radio-compact">
+                            <input type="checkbox" id="caseGainsEnabled" name="caseGainsEnabled">
+                            <label for="caseGainsEnabled">Case gains</label>
+                            <div class="input-with-suffix">
+                                <input type="number" id="coinPerCase" class="control-input-inline" value="4" min="0" max="10" step="0.5" style="width: 44px;">
+                                <span class="input-suffix">cc</span>
+                            </div>
+                        </div>
+                        <div class="radio-compact">
+                            <input type="checkbox" id="scrapGainsEnabled" name="scrapGainsEnabled">
+                            <label for="scrapGainsEnabled">Scrap gains</label>
+                            <div class="input-with-suffix">
+                                <input type="number" id="coinPerScrap" class="control-input-inline" value="0.3" min="0" max="10" step="0.1" style="width: 44px;">
+                                <span class="input-suffix">cc</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- end configure-left -->
+
+        <!-- RIGHT PANEL -->
+        <div class="configure-right">
+
+            <button id="runSimButton" class="simulate-btn" onclick="runSimulation()">RUN SIMULATION</button>
+
+            <div class="current-stats">
+                <div class="stat-row" data-stat="attack">
+                    <span class="stat-name">Attack</span>
+                    <span class="stat-value" id="currentAttack">0</span>
+                    <div class="stat-tooltip" id="tooltip-attack"></div>
+                </div>
+                <div class="stat-row" data-stat="precision">
+                    <span class="stat-name">Precision</span>
+                    <span class="stat-value" id="currentPrecision">0%</span>
+                    <div class="stat-tooltip" id="tooltip-precision"></div>
+                </div>
+                <div class="stat-row" data-stat="critChance">
+                    <span class="stat-name">Crit Ch.</span>
+                    <span class="stat-value" id="currentCritChance">0%</span>
+                    <div class="stat-tooltip" id="tooltip-critChance"></div>
+                </div>
+                <div class="stat-row" data-stat="critDamage">
+                    <span class="stat-name">Crit Dmg</span>
+                    <span class="stat-value" id="currentCritDamage">0%</span>
+                    <div class="stat-tooltip" id="tooltip-critDamage"></div>
+                </div>
+                <div class="stat-row" data-stat="armor">
+                    <span class="stat-name">Armor</span>
+                    <span class="stat-value" id="currentArmor">0%</span>
+                    <div class="stat-tooltip" id="tooltip-armor"></div>
+                </div>
+                <div class="stat-row" data-stat="dodge">
+                    <span class="stat-name">Dodge</span>
+                    <span class="stat-value" id="currentDodge">0%</span>
+                    <div class="stat-tooltip" id="tooltip-dodge"></div>
+                </div>
+            </div>
+
+            <div id="healthTrail"></div>
+
+            <div class="results">
+                <div id="resultsContent" class="results-content">
+                    <span id="simulation-hint">Configure your character and click "Run Simulation" to see battle results.</span>
+                    <div class="damage-summary" id="damageSummary"></div>
+                    <div class="hit-log" id="hitLog"></div>
+                </div>
+            </div>
+
+        </div><!-- end configure-right -->
+
+    </div><!-- end configure-layout -->
+
+    <!-- COMPARE TAB -->
+    <div id="compareTab" class="compare-container" style="display: none;">
+        <div id="compareResults" class="compare-results"></div>
+    </div>
+
+    <!-- HIDDEN: Eco Skills (JS compatibility - needs .skill-item wrapper for animation) -->
+    <div style="display:none" aria-hidden="true">
+        <span id="eco-skills-summary"></span>
+        <div class="skill-item"><span class="skill-value" id="entrepreneurship-value"></span><span id="entrepreneurship-bonus"></span><button onclick="changeSkill('entrepreneurship', -1)">-</button><button onclick="changeSkill('entrepreneurship', 1)">+</button></div>
+        <div class="skill-item"><span class="skill-value" id="energy-value"></span><span id="energy-bonus"></span><button onclick="changeSkill('energy', -1)">-</button><button onclick="changeSkill('energy', 1)">+</button></div>
+        <div class="skill-item"><span class="skill-value" id="production-value"></span><span id="production-bonus"></span><button onclick="changeSkill('production', -1)">-</button><button onclick="changeSkill('production', 1)">+</button></div>
+        <div class="skill-item"><span class="skill-value" id="management-value"></span><span id="management-bonus"></span><button onclick="changeSkill('management', -1)">-</button><button onclick="changeSkill('management', 1)">+</button></div>
+    </div>
+
+    <!-- HIDDEN: Political Bonuses (JS compatibility) -->
+    <div style="display:none" aria-hidden="true">
+        <div class="battle-type-tab active" id="attackTab" onclick="selectBattleType('attack')"></div>
+        <div class="battle-type-tab" id="defendTab" onclick="selectBattleType('defend')"></div>
+        <div class="battle-type-tab" id="revoltTab" onclick="selectBattleType('revolt')"></div>
+        <div id="countryOrderToggle" onclick="toggleDefaultBonus('countryOrder')"></div>
+        <div id="muOrderToggle" onclick="toggleDefaultBonus('muOrder')"></div>
+        <div id="muHeadquartersToggle" onclick="toggleDefaultBonus('muHeadquarters')"></div>
+        <div id="allyToggle" onclick="toggleTypeBonus('ally')"></div>
+        <div id="swornEnemyToggle" onclick="toggleTypeBonus('swornEnemy')"></div>
+        <div id="patrioticToggle" onclick="toggleTypeBonus('patriotic')"></div>
+        <select id="resistanceSelect" onchange="selectResistance(parseInt(this.value))">
+            <option value="0">0%</option><option value="15">15%</option><option value="30">30%</option>
+        </select>
+        <select id="baseSelect" onchange="selectBaseBonus(parseInt(this.value))">
+            <option value="0">0%</option><option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20">20%</option><option value="25">25%</option>
+        </select>
+        <select id="bunkerSelect" onchange="selectBunkerBonus(parseInt(this.value))">
+            <option value="0">0%</option><option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20">20%</option><option value="25">25%</option>
+        </select>
+        <select id="fanaticSelect" onchange="selectFanaticEthics(this.value)">
+            <option value="none">None</option>
+            <option value="fanaticMilitarist">Militarist +15%</option>
+            <option value="fanaticIsolationist">Isolationist +15%</option>
+            <option value="fanaticPacifist">Pacifist +15%</option>
+            <option value="fanaticDiplomatic">Diplomatic +15%</option>
+        </select>
+        <select id="basicSelect" onchange="selectBasicEthics(this.value)">
+            <option value="none">None</option>
+            <option value="militarist">Militarist +5%</option>
+            <option value="isolationist">Isolationist +5%</option>
+            <option value="pacifist">Pacifist +5%</option>
+            <option value="diplomatic">Diplomatic +5%</option>
+        </select>
+        <span id="totalBonusValue"></span>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="footer">feito por <a href="https://app.warera.io/user/689f9d8598f8c7f7c5753d80" target="_blank" rel="noopener">perucci</a></footer>
+
+    <!-- SKILL POPOVER -->
+    <div id="skillPopover" class="skill-popover" style="display:none">
+        <div class="popover-header">
+            <span class="popover-skill-name" id="popoverSkillName">ATTACK</span>
+            <button class="popover-close" onclick="closeSkillPopover()">×</button>
+        </div>
+        <div class="popover-current-bonus" id="popoverCurrentBonus"></div>
+        <div class="popover-field">
+            <label class="popover-label">Skill Level</label>
+            <input type="number" id="popoverInput" class="popover-input" min="0" max="999" onchange="previewSkillPopover()">
+        </div>
+        <div class="popover-preview" id="popoverPreview"></div>
+        <div class="popover-free" id="popoverFree"></div>
+        <button class="popover-apply-btn" onclick="applySkillPopover()">Apply</button>
+    </div>
+
+    <!-- SVG Sprite for skill icons -->
+    <svg style="display:none" aria-hidden="true">
+        <defs>
+            <symbol id="skill-svg-1" viewBox="0 0 24 24">
+                <path d="M21.8461 2.15385L20.6153 5.84615L9.46606 15.9815L8.90991 15.1246L8.01145 14.5415L18.1538 3.38462L21.8461 2.15385ZM9.77137 20.3277L10.6417 19.4574L8.24353 15.7635L4.54968 13.3654L3.67937 14.2357L6.09368 16.65L3.4583 19.5495C3.11491 19.5044 2.75537 19.6125 2.49153 19.8763C2.04091 20.3269 2.04091 21.0575 2.49153 21.5081C2.94214 21.9587 3.67268 21.9587 4.1233 21.5081C4.38699 21.2444 4.49514 20.885 4.45022 20.5418L7.34983 17.9062L9.77137 20.3277Z"/>
+            </symbol>
+            <symbol id="skill-svg-2" viewBox="0 0 24 24">
+                <path d="M19.5,3.09L20.91,4.5L16.41,9H20V11H13V4H15V7.59L19.5,3.09M20.91,19.5L19.5,20.91L15,16.41V20H13V13H20V15H16.41L20.91,19.5M4.5,3.09L9,7.59V4H11V11H4V9H7.59L3.09,4.5L4.5,3.09M3.09,19.5L7.59,15H4V13H11V20H9V16.41L4.5,20.91L3.09,19.5Z"/>
+            </symbol>
+            <symbol id="skill-svg-3" viewBox="0 0 24 24">
+                <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A6,6 0 0,0 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12A6,6 0 0,0 12,6M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10Z"/>
+            </symbol>
+            <symbol id="skill-svg-4" viewBox="0 0 24 24">
+                <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12C22,10.84 21.79,9.69 21.39,8.61L19.79,10.21C19.93,10.8 20,11.4 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4C12.6,4 13.2,4.07 13.79,4.21L15.4,2.6C14.31,2.21 13.16,2 12,2M19,2L15,6V7.5L12.45,10.05C12.3,10 12.15,10 12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12C14,11.85 14,11.7 13.95,11.55L16.5,9H18L22,5H19V2M12,6A6,6 0 0,0 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12H16A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8V6Z"/>
+            </symbol>
+            <symbol id="skill-svg-5" viewBox="0 0 24 24">
+                <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1Z"/>
+            </symbol>
+            <symbol id="skill-svg-6" viewBox="0 0 24 24">
+                <path d="M16.5,5.5A2,2 0 0,0 18.5,3.5A2,2 0 0,0 16.5,1.5A2,2 0 0,0 14.5,3.5A2,2 0 0,0 16.5,5.5M12.9,19.4L13.9,15L16,17V23H18V15.5L15.9,13.5L16.5,10.5C17.89,12.09 19.89,13 22,13V11C20.24,11.03 18.6,10.11 17.7,8.6L16.7,7C16.34,6.4 15.7,6 15,6C14.7,6 14.5,6.1 14.2,6.1L9,8.3V13H11V9.6L12.8,8.9L11.2,17L6.3,16L5.9,18L12.9,19.4M4,9A1,1 0 0,1 3,8A1,1 0 0,1 4,7H7V9H4M5,5A1,1 0 0,1 4,4A1,1 0 0,1 5,3H10V5H5M3,13A1,1 0 0,1 2,12A1,1 0 0,1 3,11H7V13H3Z"/>
+            </symbol>
+            <symbol id="skill-svg-7" viewBox="0 0 24 24">
+                <path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"/>
+            </symbol>
+            <symbol id="skill-svg-8" viewBox="0 0 24 24">
+                <path d="M5,4H19A3,3 0 0,1 22,7V11H15V10H9V11H2V7A3,3 0 0,1 5,4M11,11H13V13H11V11M2,12H9V13L11,15H13L15,13V12H22V20H2V12Z"/>
+            </symbol>
+            <symbol id="skill-svg-9" viewBox="0 0 24 24">
+                <path d="M11,9H9V2H7V9H5V2H3V9C3,11.12 4.66,12.84 6.75,12.97V22H9.25V12.97C11.34,12.84 13,11.12 13,9V2H11V9M16,6V14H18.5V22H21V2C18.24,2 16,4.24 16,6Z"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <!-- OPTIMIZER TAB -->
+    <div id="optimizerTab" class="optimizer-tab" style="display:none">
+        <div class="opt-layout">
+            <!-- Controls -->
+            <div class="opt-controls-panel">
+                <div class="opt-section-header">OTIMIZADOR DE BUILD</div>
+
+                <div class="opt-row">
+                    <span class="opt-label">Modo</span>
+                    <div class="opt-mode-toggle">
+                        <button class="opt-mode-btn active" id="optModeA" onclick="setOptMode('damage')">Dano alvo</button>
+                        <button class="opt-mode-btn" id="optModeB" onclick="setOptMode('budget')">Orçamento máximo</button>
+                    </div>
+                </div>
+
+                <div class="opt-row" id="optTargetRow">
+                    <span class="opt-label">Dano alvo</span>
+                    <div class="opt-input-row">
+                        <input type="number" id="optTargetDamage" class="opt-input" value="500000" min="0" step="10000">
+                        <span class="opt-input-suffix">dmg</span>
+                    </div>
+                </div>
+
+                <div class="opt-row" id="optBudgetRow" style="display:none">
+                    <span class="opt-label">Orçamento máximo</span>
+                    <div class="opt-input-row">
+                        <input type="number" id="optBudgetCap" class="opt-input" value="100" min="0" step="1">
+                        <span class="opt-input-suffix">cc</span>
+                    </div>
+                </div>
+
+                <div class="opt-row">
+                    <span class="opt-label">Fase a otimizar</span>
+                    <select id="optPhase" class="opt-select">
+                        <option value="burst">Burst</option>
+                        <option value="all">Todas as fases</option>
+                        <option value="prePill">Pré-pílula</option>
+                        <option value="sustained">Sustentado</option>
+                    </select>
+                </div>
+
+
+                <div class="opt-row">
+                    <span class="opt-label">Travar equipamentos atuais</span>
+                    <label class="opt-toggle-label">
+                        <input type="checkbox" id="optPinGear"> <span>Sim</span>
+                    </label>
+                </div>
+
+                <div class="opt-row">
+                    <span class="opt-label">Velocidade</span>
+                    <select id="optSpeed" class="opt-select">
+                        <option value="fast">Rápido (pop 100 / gen 80)</option>
+                        <option value="normal" selected>Normal (pop 200 / gen 150)</option>
+                        <option value="thorough">Detalhado (pop 300 / gen 250)</option>
+                    </select>
+                </div>
+
+                <button class="opt-run-btn" id="optRunBtn" onclick="runOptimizer()">▶ EXECUTAR</button>
+
+                <div class="opt-progress-wrap" id="optProgressWrap" style="display:none">
+                    <div class="opt-progress-bar">
+                        <div class="opt-progress-fill" id="optProgressFill" style="width:0%"></div>
+                    </div>
+                    <span class="opt-progress-label" id="optProgressLabel">0%</span>
+                </div>
+
+            </div>
+
+            <!-- Results -->
+            <div class="opt-results-panel">
+                <div class="opt-section-header" id="optResultsHeader">RESULTADOS</div>
+                <div id="optResults" class="opt-results-body">
+                    <div class="opt-hint">Configure os parâmetros e clique em Executar para encontrar a build ideal.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="warsim.js"></script>
+</body>
+</html>

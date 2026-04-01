@@ -1,0 +1,112 @@
+/* ===================== TABLET (max 1100px) ===================== */
+@media (max-width: 1100px) {
+    .configure-layout {
+        grid-template-columns: 1fr 440px;
+    }
+
+    .skills-grid {
+        grid-template-columns: repeat(9, 1fr);
+    }
+
+    .equipment-compact-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .buffs-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* ===================== MOBILE (max 768px) ===================== */
+@media (max-width: 768px) {
+    .configure-layout {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .configure-left {
+        min-height: unset;
+        border-right: none;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .configure-right {
+        min-height: unset;
+    }
+
+    .top-bar-fields {
+        gap: 0;
+    }
+
+    .top-field {
+        padding: 4px 8px;
+    }
+
+    .tabs-builds-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+
+    .builds-bar {
+        margin-left: 0;
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .builds-select {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .skills-grid {
+        grid-template-columns: repeat(5, 1fr);
+        gap: 3px;
+    }
+
+    .equipment-compact-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+    }
+
+    .buffs-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+    }
+
+    .current-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .settings-columns {
+        grid-template-columns: 1fr;
+    }
+
+    .top-field-sep {
+        display: none;
+    }
+}
+
+/* ===================== SMALL MOBILE (max 480px) ===================== */
+@media (max-width: 480px) {
+    .top-bar-fields {
+        flex-wrap: wrap;
+    }
+
+    .skills-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+
+    .equipment-compact-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .buffs-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .configure-left,
+    .configure-right {
+        padding: 10px 8px;
+    }
+}
