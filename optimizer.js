@@ -9,6 +9,7 @@ const PANTS_STAT       = [3,   8,   13,  25,  43,  63 ]; // (1-5)(6-10)(11-15)(2
 const BOOTS_STAT       = [3,   8,   13,  23,  35,  55 ]; // (1-5)(6-10)(11-15)(21-25)(31-40)(51-60)
 const GLOVES_STAT      = [3,   8,   13,  23,  35,  55 ]; // (1-5)(6-10)(11-15)(21-25)(31-40)(51-60)
 const RARITY_COSTS     = [1.5, 5,   20,  57,  160, 440 ];
+const SCRAP_PER_RARITY = [2,   6,   18,  54,  162, 486 ];
 const RARITY_NAMES     = ['Cinza','Verde','Azul','Roxo','Amarelo','Vermelho'];
 
 const AMMO_BONUS       = [0,  10,  20,  40 ];
@@ -188,13 +189,14 @@ function evalPhaseGear(skills, gear, ammoIdx, cfg, usePill, hp, initWDur, initAD
     // ─ Durability consumed (no cap — matches real sim: cost = nHits/100 * price) ─
     const aDurUsed = nHits * (1 - dodgeFrac);
 
-    // ─ Gear + consumable cost ─
-    const wCost  = (nHits    / 100) * RARITY_COSTS[wR];
-    const helmC  = (aDurUsed / 100) * RARITY_COSTS[helmR];
-    const chestC = (aDurUsed / 100) * RARITY_COSTS[chestR];
-    const pantsC = (aDurUsed / 100) * RARITY_COSTS[pantsR];
-    const bootsC = (aDurUsed / 100) * RARITY_COSTS[bootsR];
-    const glovC  = (aDurUsed / 100) * RARITY_COSTS[glovR];
+    // ─ Gear + consumable cost (net of scrap gains) ─
+    const cps    = cfg.coinPerScrap || 0;   // cc per scrap gained
+    const wCost  = (nHits    / 100) * (RARITY_COSTS[wR]    - SCRAP_PER_RARITY[wR]    * cps);
+    const helmC  = (aDurUsed / 100) * (RARITY_COSTS[helmR]  - SCRAP_PER_RARITY[helmR]  * cps);
+    const chestC = (aDurUsed / 100) * (RARITY_COSTS[chestR] - SCRAP_PER_RARITY[chestR] * cps);
+    const pantsC = (aDurUsed / 100) * (RARITY_COSTS[pantsR] - SCRAP_PER_RARITY[pantsR] * cps);
+    const bootsC = (aDurUsed / 100) * (RARITY_COSTS[bootsR] - SCRAP_PER_RARITY[bootsR] * cps);
+    const glovC  = (aDurUsed / 100) * (RARITY_COSTS[glovR]  - SCRAP_PER_RARITY[glovR]  * cps);
     const ammoC  = nHits * AMMO_COST_HIT[ammoIdx];
     const pillC  = usePill ? (cfg.buffCosts ? cfg.buffCosts.pill : 35) : 0;
 

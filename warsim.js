@@ -3121,10 +3121,16 @@ function updateHealthTrail() {
 
         <div class="ht-step">
             <div class="ht-step-label">0h <span class="ht-tag ht-tag-neutral">Zerado</span></div>
-            ${hpBar(0, 0, fullHp)}
-            ${hungerDots(0, hungerCap)}
-            <div class="ht-step-nums">0 / ${fullHp} HP &nbsp;·&nbsp; 0 / ${hungerCap} fome</div>
+            ${hpBar(baseHP, foodHpPerUnit * hungerCap, fullHp)}
+            ${hungerDots(hungerCap, hungerCap)}
+            <div class="ht-step-nums">${fullHp} / ${fullHp} HP (potencial) &nbsp;·&nbsp; ${hungerCap} / ${hungerCap} fome</div>
             <div class="ht-step-note">saiu da rodada com tudo zerado — começa a recuperar agora</div>
+        </div>
+
+        <div class="ht-energy-budget" style="border-color:rgba(120,120,120,0.3);background:rgba(120,120,120,0.05);margin-bottom:8px;">
+            <div class="ht-budget-label" style="color:var(--text-secondary)">Potencial máximo</div>
+            <div class="ht-budget-val">${fullHp} <span class="ht-budget-unit">HP quando full</span></div>
+            <div class="ht-budget-note">${baseHP} HP base${foodHpPerUnit > 0 ? ` + ${foodHpPerUnit * hungerCap} de ${foodLabel} (${hungerCap} fome)` : ''}</div>
         </div>
 
         <div class="ht-connector">
@@ -3138,36 +3144,38 @@ function updateHealthTrail() {
             ${hungerDots(hungerAtPill, hungerCap)}
             <div class="ht-step-nums">${totalHpAtPill} / ${fullHp} HP (${hpPctAtPill}%) &nbsp;·&nbsp; ${hungerAtPill} / ${hungerCap} fome (${hungerPctAtPill}%)</div>
             ${foodHpAtPill > 0 ? `<div class="ht-step-note">${hpBaseAtPill} HP base + <span class="ht-food-val">${foodHpAtPill} de ${foodLabel}</span> (${hungerAtPill} unid. de fome)</div>` : ''}
-            ${hoursFromPillToFull > 0 ? `<div class="ht-step-note">faltam ${hoursFromPillToFull}h para HP base ficar full</div>` : '<div class="ht-step-note">HP já está full ao tomar a pílula</div>'}
+            ${hoursFromPillToFull > 0
+                ? `<div class="ht-step-note">faltam ${hoursFromPillToFull}h para HP base ficar full — mas o burst é agora</div>`
+                : '<div class="ht-step-note">HP já está full ao tomar a pílula ✓</div>'}
         </div>
 
-        <div class="ht-energy-budget ht-energy-pre">
-            <div class="ht-budget-label">Energia disponível — Pré-pílula (${prePillHours}h)</div>
+        <div class="ht-energy-budget ht-energy-burst">
+            <div class="ht-budget-label">Energia disponível — Burst (na pílula)</div>
             <div class="ht-budget-val">${totalHpAtPill} <span class="ht-budget-unit">HP para gastar</span></div>
-            ${totalHpAtPill > 0 && fullHp > 0 ? `<div class="ht-budget-note">${hpPctAtPill}% do HP full — ${pillReached ? 'HP já estava cheio antes da pílula' : `${(fullHp - totalHpAtPill)} HP ainda por recuperar`}</div>` : ''}
+            <div class="ht-budget-note">${hpPctAtPill}% do HP máximo${pillReached ? ' — já estava full' : ` — ${fullHp - totalHpAtPill} HP não recuperados`}</div>
         </div>
 
-        ${!pillReached ? `
         <div class="ht-connector">
             <span class="ht-connector-line"></span>
-            <span class="ht-connector-label">mais ${hoursFromPillToFull}h para completar…</span>
+            <span class="ht-connector-label">burst → zerado → recuperando ${hpPerHour.toFixed(1)} HP/hr por ${sustainHours}h…</span>
         </div>
 
-        <div class="ht-step ht-step-full">
-            <div class="ht-step-label">10h <span class="ht-tag ht-tag-full">Full</span></div>
-            ${hpBar(baseHP, foodHpPerUnit * hungerCap, fullHp)}
-            ${hungerDots(hungerCap, hungerCap)}
-            <div class="ht-step-nums">${fullHp} / ${fullHp} HP (100%) &nbsp;·&nbsp; ${hungerCap} / ${hungerCap} fome</div>
-            <div class="ht-step-note">HP base leva sempre 10h para recuperar do zero</div>
+        <div class="ht-step">
+            <div class="ht-step-label">${prePillHours + sustainHours}h <span class="ht-tag ht-tag-neutral">Sustentado</span></div>
+            ${hpBar(hpBaseSustain, foodHpSustain, fullHp)}
+            ${hungerDots(hungerSustain, hungerCap)}
+            <div class="ht-step-nums">${totalHpSustain} / ${fullHp} HP (${Math.round(totalHpSustain / fullHp * 100)}%) &nbsp;·&nbsp; ${hungerSustain} / ${hungerCap} fome</div>
+            ${totalHpSustain < fullHp
+                ? `<div class="ht-step-note">${fullHp - totalHpSustain} HP ainda por recuperar para chegar ao máximo</div>`
+                : `<div class="ht-step-note">HP estará full ao fim das ${sustainHours}h ✓</div>`}
         </div>
-        ` : ''}
 
-    </div>
+        <div class="ht-energy-budget ht-energy-sust">
+            <div class="ht-budget-label">Energia disponível — Sustentado</div>
+            <div class="ht-budget-val">${totalHpSustain} <span class="ht-budget-unit">HP para gastar</span></div>
+            <div class="ht-budget-note">${hpBaseSustain} HP base${foodHpSustain > 0 ? ` + ${foodHpSustain} de ${foodLabel} (${hungerSustain} fome)` : ''} · recuperado em ${sustainHours}h após burst</div>
+        </div>
 
-    <div class="ht-energy-budget ht-energy-sust">
-        <div class="ht-budget-label">Energia disponível — Sustentado (${sustainHours}h)</div>
-        <div class="ht-budget-val">${totalHpSustain} <span class="ht-budget-unit">HP para gastar</span></div>
-        <div class="ht-budget-note">${hpBaseSustain} HP base${foodHpSustain > 0 ? ` + ${foodHpSustain} de ${foodLabel} (${hungerSustain} fome)` : ''} · recuperado em ${sustainHours}h a partir de zero</div>
     </div>`;
 }
 
@@ -4120,6 +4128,7 @@ function runOptimizer() {
         targetDamage:     parseFloat(document.getElementById('optTargetDamage').value) || 500000,
         budgetCap:        parseFloat(document.getElementById('optBudgetCap').value) || 100,
         buffCosts:        { ...state.buffCosts },
+        coinPerScrap:     parseFloat(document.getElementById('coinPerScrap')?.value) || 0,
         pinned:           _buildPinnedFromState(),
         popSize,
         nGen
