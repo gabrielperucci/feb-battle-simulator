@@ -194,15 +194,17 @@ function evalPhaseGear(skills, gear, ammoIdx, cfg, usePill, hp, initWDur, initAD
     const wDurToPay = Math.max(0, nHits - initWDur);       // weapon dur that needs payment
     const aDurToPay = Math.max(0, aDurUsed - initADur);    // armor dur that needs payment
 
-    // Gross cost (matches simulation display)
-    const wCost  = (wDurToPay / 100) * RARITY_COSTS[wR];
-    const helmC  = (aDurToPay / 100) * RARITY_COSTS[helmR];
-    const chestC = (aDurToPay / 100) * RARITY_COSTS[chestR];
-    const pantsC = (aDurToPay / 100) * RARITY_COSTS[pantsR];
-    const bootsC = (aDurToPay / 100) * RARITY_COSTS[bootsR];
-    const glovC  = (aDurToPay / 100) * RARITY_COSTS[glovR];
+    // Gross cost — items are bought whole (ceil to full units)
+    const wUnits = wDurToPay > 0 ? Math.ceil(wDurToPay / 100) : 0;
+    const aUnits = aDurToPay > 0 ? Math.ceil(aDurToPay / 100) : 0;
+    const wCost  = wUnits * RARITY_COSTS[wR];
+    const helmC  = aUnits * RARITY_COSTS[helmR];
+    const chestC = aUnits * RARITY_COSTS[chestR];
+    const pantsC = aUnits * RARITY_COSTS[pantsR];
+    const bootsC = aUnits * RARITY_COSTS[bootsR];
+    const glovC  = aUnits * RARITY_COSTS[glovR];
 
-    // Scrap gains (subtracted for net cost used in optimization)
+    // Scrap gains — proportional to actual durability used (not whole units)
     const cps = cfg.coinPerScrap || 0;
     const scrapGain = cps > 0 ? (
         (wDurToPay / 100) * SCRAP_PER_RARITY[wR] * cps +

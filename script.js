@@ -1083,7 +1083,7 @@ function renderScrapCalculator(phaseResults, totalScrapsFromBattle) {
     const rarityLabels = { gray:'Cinza', green:'Verde', blue:'Azul', purple:'Roxo', yellow:'Amarelo (Tank)', red:'Vermelho (Jato)' };
     const rarityColors = { gray:'#aaa', green:'#4caf50', blue:'#2196f3', purple:'#9c27b0', yellow:'#ffeb3b', red:'var(--accent-red)' };
 
-    const coinPerScrap   = parseFloat(document.getElementById('coinPerScrap').value) || 0.3;
+    const coinPerScrap   = parseFloat(document.getElementById('coinPerScrap').value) || 0.25;
     const totalFromBattle = Math.round(totalScrapsFromBattle);
     const balance        = Math.max(0, state.scrapBalance || 0);
     const combined       = balance + totalFromBattle;
@@ -1229,18 +1229,21 @@ function renderMultiStageSummary(phaseResults) {
         const pLabel = phaseLabels[p.phase];
 
         p.weaponResults.forEach(wr => {
-            const wCost = (wr.durabilityUsed / 100) * (wr.weapon.cost || 0);
+            // Weapons are bought whole — pay for each unit used (ceil)
+            const wUnits = wr.durabilityUsed > 0 ? Math.ceil(wr.durabilityUsed / 100) : 0;
+            const wCost = wUnits * (wr.weapon.cost || 0);
             totalCostOnly += wCost;
             if (wCost > 0) costRows += `<div class="cost-row">
-                <span class="cost-label">Arma ${wr.weapon.name||'?'} (${pLabel})</span>
+                <span class="cost-label">${t('equip.weapon')} ${wr.weapon.name||'?'} (${pLabel})</span>
                 <span class="cost-value cost-negative">-${wCost.toFixed(2)}cc</span>
             </div>`;
         });
 
         p.loadoutResults.forEach(lr => {
             const ec = lr.loadout.equipmentCosts || {};
-            const armorCostTotal = (ec.helmet||0) + (ec.chest||0) + (ec.pants||0) + (ec.boots||0) + (ec.gloves||0);
-            const armorCost = (lr.durabilityUsed / 100) * armorCostTotal;
+            // Armor pieces are bought whole — pay for each unit used (ceil)
+            const aUnits = lr.durabilityUsed > 0 ? Math.ceil(lr.durabilityUsed / 100) : 0;
+            const armorCost = aUnits * ((ec.helmet||0) + (ec.chest||0) + (ec.pants||0) + (ec.boots||0) + (ec.gloves||0));
 
             let ammoCost = 0;
             if (lr.loadout.ammo) {
@@ -1293,7 +1296,7 @@ function renderMultiStageSummary(phaseResults) {
 
     // Scraps
     const scrapGainsEnabled = document.getElementById('scrapGainsEnabled').checked;
-    const coinPerScrap = parseFloat(document.getElementById('coinPerScrap').value) || 0.3;
+    const coinPerScrap = parseFloat(document.getElementById('coinPerScrap').value) || 0.25;
     let totalScraps = 0;
     if (scrapGainsEnabled) {
         phaseResults.forEach(p => {
@@ -1692,8 +1695,11 @@ function renderBattleSummary(concatPrePillHits, concatBurstHits, concatSustained
                        state.equipmentCosts.pants + state.equipmentCosts.boots + 
                        state.equipmentCosts.gloves;
     
-    const weaponCostTotal = (weaponDurabilityLost / 100) * weaponCost;
-    const armorCostTotal = (armorDurabilityLost / 100) * armorCosts;
+    // Items are bought whole — pay for full units
+    const weaponUnits = weaponDurabilityLost > 0 ? Math.ceil(weaponDurabilityLost / 100) : 0;
+    const armorUnits  = armorDurabilityLost > 0 ? Math.ceil(armorDurabilityLost / 100) : 0;
+    const weaponCostTotal = weaponUnits * weaponCost;
+    const armorCostTotal  = armorUnits * armorCosts;
     
     // Calculate buff costs
     let buffCostTotal = 0;
@@ -2283,7 +2289,7 @@ function init() {
     }
     
     if (state.battle.coinPerScrap === null || state.battle.coinPerScrap === undefined) {
-        state.battle.coinPerScrap = 0.3;
+        state.battle.coinPerScrap = 0.25;
     }
 
     // Multi-stage migration
@@ -2410,7 +2416,7 @@ function init() {
     document.getElementById('coinPerCase').value = state.battle.coinPerCase || 4;
     document.getElementById('coinPerCase2').value = state.battle.coinPerCase2 || 33;
     document.getElementById('scrapGainsEnabled').checked = state.battle.scrapGainsEnabled !== undefined ? state.battle.scrapGainsEnabled : true;
-    document.getElementById('coinPerScrap').value = state.battle.coinPerScrap || 0.3;
+    document.getElementById('coinPerScrap').value = state.battle.coinPerScrap || 0.25;
     document.getElementById('damageSummary').style.display = 'none';
     document.getElementById('level-value').textContent = state.level;
     if (document.getElementById('level-input')) document.getElementById('level-input').value = state.level;
@@ -2763,7 +2769,7 @@ document.getElementById('scrapGainsEnabled').addEventListener("change", (event) 
 });
 
 document.getElementById('coinPerScrap').addEventListener("input", (event) => {
-    state.battle.coinPerScrap = parseFloat(event.target.value) || 0.3;
+    state.battle.coinPerScrap = parseFloat(event.target.value) || 0.25;
 });
 
 document.getElementById('bountyPerKDamage').addEventListener("change", (event) => {
