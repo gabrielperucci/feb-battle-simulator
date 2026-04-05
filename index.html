@@ -7,18 +7,25 @@
     <link href="style.css" rel="stylesheet" type="text/css" />
     <link href="responsive.css" rel="stylesheet" type="text/css" />
     <link rel="icon" type="image/png" href="assets/logo.png">
+    <script src="i18n.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 </head>
 <body>
+
+    <!-- HEADER -->
+    <header class="site-header">
+        <a href="https://app.warera.io/mu/6873eea83cd88c7b734469b3" target="_blank" rel="noopener"><img src="assets/logo.png" alt="FEB" class="site-logo"></a>
+        <a href="https://app.warera.io/mu/6873eea83cd88c7b734469b3" target="_blank" rel="noopener" class="site-title">FEB - Battle Simulator</a>
+    </header>
 
     <!-- TOP BAR -->
     <div class="top-bar">
         <div class="top-bar-fields">
             <div class="top-field">
-                <span class="top-field-label">LEVEL</span>
+                <span class="top-field-label" data-i18n="top.level">Level</span>
                 <div class="top-field-row">
                     <input type="number" id="level-input" class="top-input" value="10" min="0" step="1" onchange="setLevel(parseInt(this.value) || 0)">
-                    <button class="top-btn-reset" onclick="resetSkills()">Reset</button>
+                    <button class="top-btn-reset" onclick="resetSkills()" data-i18n="top.reset">Reset</button>
                 </div>
                 <span class="top-field-sub" id="skill-points-value"></span>
                 <span id="level-value" style="display:none">10</span>
@@ -26,7 +33,7 @@
             </div>
             <div class="top-field-sep"></div>
             <div class="top-field">
-                <span class="top-field-label">RANK BONUS</span>
+                <span class="top-field-label" data-i18n="top.rankBonus">Rank Bonus</span>
                 <div class="top-field-row">
                     <input type="number" id="military-rank-bonus" class="top-input" value="10" min="0" max="100" step="0.1" onchange="changeMilitaryRankBonus(parseFloat(this.value))">
                     <span class="top-field-suffix">%</span>
@@ -34,7 +41,7 @@
             </div>
             <div class="top-field-sep"></div>
             <div class="top-field">
-                <span class="top-field-label">BATTLE BONUS</span>
+                <span class="top-field-label" data-i18n="top.battleBonus">Battle Bonus</span>
                 <div class="top-field-row">
                     <input type="number" id="battle-bonus-direct" class="top-input" value="0" min="0" max="300" step="1" onchange="setBattleBonusDirect(parseFloat(this.value))">
                     <span class="top-field-suffix">%</span>
@@ -42,7 +49,7 @@
             </div>
             <div class="top-field-sep"></div>
             <div class="top-field">
-                <span class="top-field-label">COMPANIES</span>
+                <span class="top-field-label" data-i18n="top.companies">Companies</span>
                 <div class="top-field-row">
                     <button class="top-btn" onclick="changeSkill('companies', -1)">-</button>
                     <span class="top-field-value" id="companies-bonus">2</span>
@@ -51,23 +58,30 @@
                 <span class="top-field-sub" id="companies-value"></span>
             </div>
         </div>
+        <select id="langSelect" class="lang-select" onchange="setLanguage(this.value)">
+            <option value="pt">🇧🇷 PT</option>
+            <option value="en">🇺🇸 EN</option>
+            <option value="es">🇪🇸 ES</option>
+            <option value="fr">🇫🇷 FR</option>
+            <option value="ru">🇷🇺 RU</option>
+        </select>
     </div>
 
     <!-- TABS + BUILDS BAR -->
     <div class="tabs-builds-bar">
         <div class="main-tabs">
-            <div class="main-tab active" onclick="switchTab('configure')">Configure</div>
-            <div class="main-tab" onclick="switchTab('compare')">Compare</div>
-            <div class="main-tab" onclick="switchTab('optimizer')">Otimizador</div>
+            <div class="main-tab active" onclick="switchTab('configure')" data-i18n="tab.configure">Configure</div>
+            <div class="main-tab" onclick="switchTab('compare')" data-i18n="tab.compare">Compare</div>
+            <div class="main-tab" onclick="switchTab('optimizer')" data-i18n="tab.optimizer">Otimizador</div>
         </div>
         <div id="buildsBar" class="builds-bar">
             <select id="buildsSelect" class="builds-select" onchange="onBuildSelect(this)">
                 <option value="">-- Select Build --</option>
             </select>
             <div class="builds-actions">
-                <button class="builds-btn builds-btn-save" onclick="saveBuild()">Save</button>
-                <button class="builds-btn builds-btn-create" onclick="createBuild()">New</button>
-                <button class="builds-btn builds-btn-delete" onclick="deleteBuild()">Delete</button>
+                <button class="builds-btn builds-btn-save" onclick="saveBuild()" data-i18n="build.save">Save</button>
+                <button class="builds-btn builds-btn-create" onclick="createBuild()" data-i18n="build.new">New</button>
+                <button class="builds-btn builds-btn-delete" onclick="deleteBuild()" data-i18n="build.delete">Delete</button>
             </div>
         </div>
     </div>
@@ -179,82 +193,64 @@
                 <div id="buffFish"></div><div id="buffFishStatsBox"></div><input type="number" id="fishCost" value="4.50">
             </div>
 
-            <!-- MULTI-STAGE LOADOUTS (always visible) -->
-            <div id="multiStageSection">
-                <div class="section-header">LOADOUTS</div>
-                <div class="ms-pipeline-header">Weapons</div>
-                <div id="weaponList"></div>
-                <div class="ms-pipeline-header">Armor Loadouts</div>
-                <div id="loadoutList"></div>
-                <div class="ms-pipeline-header">Visão Geral das Fases</div>
-                <div id="stagePipeline"></div>
-            </div>
-
             <!-- BATTLE SETTINGS -->
-            <div class="section-header">BATTLE SETTINGS</div>
+            <div class="section-header" data-i18n="settings.battleSettings">Battle Settings</div>
+
             <div class="battle-settings-panel">
-                <div class="settings-columns">
-                    <div class="settings-col">
-                        <div class="radio-compact">
-                            <input type="radio" id="singleSim" name="simType" value="single" checked>
-                            <label for="singleSim">Single battle</label>
-                        </div>
-                        <div class="radio-compact">
-                            <input type="radio" id="multipleSim" name="simType" value="multiple">
-                            <label for="multipleSim">Average of</label>
-                            <input type="number" id="battleCount" class="control-input-inline" value="10000">
-                            <label for="multipleSim">battles</label>
-                        </div>
-                        <div class="radio-compact">
-                            <input type="checkbox" id="showCombatLog" name="showCombatLog">
-                            <label for="showCombatLog">Show combat log</label>
-                        </div>
-                        <div class="radio-compact">
-                            <input type="checkbox" id="prePillPhaseEnabled" name="prePillPhaseEnabled">
-                            <label for="prePillPhaseEnabled">Pre-pill hits for</label>
-                            <input type="number" id="prePillPhaseHours" class="control-input-inline" value="6" min="0" max="16" step="0.5" style="width: 44px;">
-                            <label for="prePillPhaseEnabled">hrs</label>
-                        </div>
-                        <div class="radio-compact" style="display:none" aria-hidden="true">
-                            <input type="checkbox" id="multiStageEnabled" name="multiStageEnabled" onchange="toggleMultiStage(this.checked)">
-                            <label for="multiStageEnabled">Multi-stage loadouts</label>
-                        </div>
+                <div class="bs-grid">
+                    <div class="bs-item">
+                        <input type="radio" id="singleSim" name="simType" value="single" checked>
+                        <label for="singleSim">Single</label>
                     </div>
-                    <div class="settings-col">
-                        <div class="radio-compact">
-                            <input type="checkbox" id="weaponDurabilityLimit" name="durabilityLimit">
-                            <label for="weaponDurabilityLimit">Limit weapon 100 dur.</label>
-                        </div>
-                        <div class="radio-compact">
-                            <input type="checkbox" id="armorDurabilityLimit" name="durabilityLimit">
-                            <label for="armorDurabilityLimit">Limit armor 100 dur.</label>
-                        </div>
-                        <div class="radio-compact">
-                            <input type="checkbox" id="bountyEnabled" name="bountyEnabled">
-                            <label for="bountyEnabled">Bounty</label>
-                            <div class="input-with-suffix">
-                                <input type="number" id="bountyPerKDamage" class="control-input-inline" value="0.5" min="0" max="2" step="0.1" style="width: 44px;">
-                                <span class="input-suffix">cc</span>
-                            </div>
-                        </div>
-                        <div class="radio-compact">
-                            <input type="checkbox" id="caseGainsEnabled" name="caseGainsEnabled">
-                            <label for="caseGainsEnabled">Case gains</label>
-                            <div class="input-with-suffix">
-                                <input type="number" id="coinPerCase" class="control-input-inline" value="4" min="0" max="10" step="0.5" style="width: 44px;">
-                                <span class="input-suffix">cc</span>
-                            </div>
-                        </div>
-                        <div class="radio-compact">
-                            <input type="checkbox" id="scrapGainsEnabled" name="scrapGainsEnabled">
-                            <label for="scrapGainsEnabled">Scrap gains</label>
-                            <div class="input-with-suffix">
-                                <input type="number" id="coinPerScrap" class="control-input-inline" value="0.3" min="0" max="10" step="0.1" style="width: 44px;">
-                                <span class="input-suffix">cc</span>
-                            </div>
-                        </div>
+                    <div class="bs-item">
+                        <input type="radio" id="multipleSim" name="simType" value="multiple">
+                        <label for="multipleSim">Avg</label>
+                        <input type="number" id="battleCount" class="bs-input" value="10000">
+                    </div>
+                    <div class="bs-item">
+                        <input type="checkbox" id="prePillPhaseEnabled" name="prePillPhaseEnabled">
+                        <label for="prePillPhaseEnabled">Pre-pill</label>
+                        <input type="number" id="prePillPhaseHours" class="bs-input" value="6" min="0" max="16" step="0.5">
+                        <span class="bs-suffix">h</span>
+                    </div>
+                    <div class="bs-item">
+                        <input type="checkbox" id="bountyEnabled" name="bountyEnabled">
+                        <label for="bountyEnabled">Bounty</label>
+                        <input type="number" id="bountyPerKDamage" class="bs-input" value="0.5" min="0" max="2" step="0.1">
+                        <span class="bs-suffix">cc</span>
+                    </div>
+                    <div class="bs-item">
+                        <input type="checkbox" id="caseGainsEnabled" name="caseGainsEnabled">
+                        <label for="caseGainsEnabled">Case</label>
+                        <input type="number" id="coinPerCase" class="bs-input" value="4" min="0" max="20" step="0.5">
+                        <span class="bs-suffix">cc</span>
+                        <label style="font-size:10px;color:var(--text-muted)">Rara</label>
+                        <input type="number" id="coinPerCase2" class="bs-input" value="33" min="0" max="500" step="1">
+                        <span class="bs-suffix">cc</span>
+                    </div>
+                    <div class="bs-item">
+                        <input type="checkbox" id="scrapGainsEnabled" name="scrapGainsEnabled">
+                        <label for="scrapGainsEnabled">Scraps</label>
+                        <input type="number" id="coinPerScrap" class="bs-input" value="0.3" min="0" max="10" step="0.1">
+                        <span class="bs-suffix">cc</span>
                     </div>
                 </div>
+                <!-- Hidden but kept for JS compat -->
+                <input type="checkbox" id="showCombatLog" name="showCombatLog" style="display:none">
+                <input type="checkbox" id="weaponDurabilityLimit" name="durabilityLimit" style="display:none">
+                <input type="checkbox" id="armorDurabilityLimit" name="durabilityLimit" style="display:none">
+                <input type="checkbox" id="multiStageEnabled" name="multiStageEnabled" onchange="toggleMultiStage(this.checked)" style="display:none">
+            </div>
+
+            <!-- MULTI-STAGE LOADOUTS -->
+            <div id="multiStageSection">
+                <div class="section-header" data-i18n="loadouts.title">Loadouts</div>
+                <div class="ms-pipeline-header" data-i18n="loadouts.weapons">Weapons</div>
+                <div id="weaponList"></div>
+                <div class="ms-pipeline-header" data-i18n="loadouts.armorLoadouts">Armor Loadouts</div>
+                <div id="loadoutList"></div>
+                <div class="ms-pipeline-header" data-i18n="loadouts.phaseOverview">Phase Overview</div>
+                <div id="stagePipeline"></div>
             </div>
 
         </div><!-- end configure-left -->
@@ -262,7 +258,7 @@
         <!-- RIGHT PANEL -->
         <div class="configure-right">
 
-            <button id="runSimButton" class="simulate-btn" onclick="runSimulation()">RUN SIMULATION</button>
+            <button id="runSimButton" class="simulate-btn" onclick="runSimulation()" data-i18n="sim.runSimulation">Run Simulation</button>
 
             <div class="current-stats">
                 <div class="stat-row" data-stat="attack">
@@ -301,7 +297,7 @@
 
             <div class="results">
                 <div id="resultsContent" class="results-content">
-                    <span id="simulation-hint">Configure your character and click "Run Simulation" to see battle results.</span>
+                    <span id="simulation-hint" data-i18n="sim.configureHint">Configure your character and click "Run Simulation" to see battle results.</span>
                     <div class="damage-summary" id="damageSummary"></div>
                     <div class="hit-log" id="hitLog"></div>
                 </div>
@@ -419,18 +415,18 @@
         <div class="opt-layout">
             <!-- Controls -->
             <div class="opt-controls-panel">
-                <div class="opt-section-header">OTIMIZADOR DE BUILD</div>
+                <div class="opt-section-header" data-i18n="opt.title">Otimizador de Build</div>
 
                 <div class="opt-row">
                     <span class="opt-label">Modo</span>
                     <div class="opt-mode-toggle">
-                        <button class="opt-mode-btn active" id="optModeA" onclick="setOptMode('damage')">Dano alvo</button>
-                        <button class="opt-mode-btn" id="optModeB" onclick="setOptMode('budget')">Orçamento máximo</button>
+                        <button class="opt-mode-btn active" id="optModeA" onclick="setOptMode('damage')" data-i18n="opt.targetDamage">Dano alvo</button>
+                        <button class="opt-mode-btn" id="optModeB" onclick="setOptMode('budget')" data-i18n="opt.maxBudget">Orçamento máximo</button>
                     </div>
                 </div>
 
                 <div class="opt-row" id="optTargetRow">
-                    <span class="opt-label">Dano alvo</span>
+                    <span class="opt-label" data-i18n="opt.targetDamage">Dano alvo</span>
                     <div class="opt-input-row">
                         <input type="number" id="optTargetDamage" class="opt-input" value="500000" min="0" step="10000">
                         <span class="opt-input-suffix">dmg</span>
@@ -438,7 +434,7 @@
                 </div>
 
                 <div class="opt-row" id="optBudgetRow" style="display:none">
-                    <span class="opt-label">Orçamento máximo</span>
+                    <span class="opt-label" data-i18n="opt.maxBudget">Orçamento máximo</span>
                     <div class="opt-input-row">
                         <input type="number" id="optBudgetCap" class="opt-input" value="100" min="0" step="1">
                         <span class="opt-input-suffix">cc</span>
@@ -446,33 +442,33 @@
                 </div>
 
                 <div class="opt-row">
-                    <span class="opt-label">Fase a otimizar</span>
+                    <span class="opt-label" data-i18n="opt.phaseToOptimize">Fase a otimizar</span>
                     <select id="optPhase" class="opt-select">
-                        <option value="burst">Burst</option>
-                        <option value="all">Todas as fases</option>
-                        <option value="prePill">Pré-pílula</option>
-                        <option value="sustained">Sustentado</option>
+                        <option value="burst" data-i18n="phase.burst">Burst</option>
+                        <option value="all" data-i18n="phase.all">Todas as fases</option>
+                        <option value="prePill" data-i18n="phase.prePill">Pré-pílula</option>
+                        <option value="sustained" data-i18n="phase.sustained">Sustentado</option>
                     </select>
                 </div>
 
-
                 <div class="opt-row">
-                    <span class="opt-label">Travar equipamentos atuais</span>
+                    <span class="opt-label" data-i18n="opt.lockGear">Travar equipamentos atuais</span>
                     <label class="opt-toggle-label">
-                        <input type="checkbox" id="optPinGear"> <span>Sim</span>
+                        <input type="checkbox" id="optPinGear"> <span data-i18n="opt.yes">Sim</span>
                     </label>
                 </div>
 
                 <div class="opt-row">
-                    <span class="opt-label">Velocidade</span>
+                    <span class="opt-label" data-i18n="opt.speed">Velocidade</span>
                     <select id="optSpeed" class="opt-select">
-                        <option value="fast">Rápido (pop 100 / gen 80)</option>
-                        <option value="normal" selected>Normal (pop 200 / gen 150)</option>
-                        <option value="thorough">Detalhado (pop 300 / gen 250)</option>
+                        <option value="fast" data-i18n="opt.speedFast">Rápido (pop 150 / gen 100)</option>
+                        <option value="normal" selected data-i18n="opt.speedNormal">Normal (pop 300 / gen 200)</option>
+                        <option value="thorough" data-i18n="opt.speedThorough">Detalhado (pop 500 / gen 400)</option>
+                        <option value="ultra" data-i18n="opt.speedUltra">Ultra (pop 800 / gen 600)</option>
                     </select>
                 </div>
 
-                <button class="opt-run-btn" id="optRunBtn" onclick="runOptimizer()">▶ EXECUTAR</button>
+                <button class="opt-run-btn" id="optRunBtn" onclick="runOptimizer()" data-i18n="opt.run">▶ EXECUTAR</button>
 
                 <div class="opt-progress-wrap" id="optProgressWrap" style="display:none">
                     <div class="opt-progress-bar">
@@ -485,14 +481,14 @@
 
             <!-- Results -->
             <div class="opt-results-panel">
-                <div class="opt-section-header" id="optResultsHeader">RESULTADOS</div>
+                <div class="opt-section-header" id="optResultsHeader" data-i18n="opt.results">Resultados</div>
                 <div id="optResults" class="opt-results-body">
-                    <div class="opt-hint">Configure os parâmetros e clique em Executar para encontrar a build ideal.</div>
+                    <div class="opt-hint" data-i18n="opt.hint">Configure os parâmetros e clique em Executar para encontrar a build ideal.</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="warsim.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

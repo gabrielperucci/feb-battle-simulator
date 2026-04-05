@@ -897,9 +897,10 @@ function getLoadoutRarity(loadout) {
 
 function getLoadoutSummaryText(loadout, index) {
     const name = loadout.name || String.fromCharCode(65 + index);
-    const ammoLabel = loadout.ammo ? loadout.ammo.charAt(0).toUpperCase() + loadout.ammo.slice(1) : 'No Ammo';
-    const pillLabel = loadout.pill ? 'Pill' : '';
-    return `${name}: Helmet ${loadout.armors.helmet}% | ${ammoLabel}${pillLabel ? ' | ' + pillLabel : ''}`;
+    const ammoMap = { light: 'ammo.light', ammo: 'ammo.ammo', heavy: 'ammo.heavy' };
+    const ammoLabel = loadout.ammo ? t(ammoMap[loadout.ammo] || 'ammo.none') : t('ammo.none');
+    const pillLabel = loadout.pill ? t('buff.pill') : '';
+    return `${name}: ${t('equip.helmet')} ${loadout.armors.helmet}% | ${ammoLabel}${pillLabel ? ' | ' + pillLabel : ''}`;
 }
 
 function runMultiStageSimulation() {
@@ -917,7 +918,8 @@ function runMultiStageSimulation() {
 
     const allWeapons  = state.multiStage.weapons || [];
     const allLoadouts = state.multiStage.loadouts;
-    const iterations  = simType === 'single' ? 1 : battleCount;
+    // Always run multiple iterations for realistic averages (min 10k)
+    const iterations  = Math.max(battleCount, 10000);
 
     const PHASES = ['prePill', 'burst', 'sustained'];
 
@@ -1027,10 +1029,11 @@ function runMultiStageSimulation() {
             // Write back carry-over: remaining durability after this phase per global item index
             wIdxs.forEach((wi, j) => { weaponCarry[wi]  = finalWDur[j]; });
             lIdxs.forEach((li, j) => { loadoutCarry[li] = finalLDur[j]; });
+
         });
     }
 
-    const divisor = simType === 'single' ? 1 : battleCount;
+    const divisor = iterations;
 
     const phaseResults = PHASES.map(ph => {
         const wIdxs    = phaseWeaponIdxs[ph];
@@ -1087,7 +1090,7 @@ function renderScrapCalculator(phaseResults, totalScrapsFromBattle) {
 
     // Per-phase scrap breakdown
     const phaseScrapRows = phaseResults.map(p => {
-        const phLabel = { prePill:'Pré-pílula', burst:'Burst', sustained:'Sustentado' }[p.phase];
+        const phLabel = { prePill: t('phase.prePill'), burst: t('phase.burst'), sustained: t('phase.sustained') }[p.phase];
         let phScraps = 0;
         p.weaponResults.forEach(wr => {
             const r = getRarityFromStats('weapon', wr.weapon.primary, wr.weapon.secondary);
@@ -1166,7 +1169,7 @@ function renderScrapCalculator(phaseResults, totalScrapsFromBattle) {
 }
 
 function renderMultiStageSummary(phaseResults) {
-    const phaseLabels = { prePill: 'Pré-pílula', burst: 'Burst', sustained: 'Sustentado' };
+    const phaseLabels = { prePill: t('phase.prePill'), burst: t('phase.burst'), sustained: t('phase.sustained') };
     const phaseColorVar = { prePill: 'var(--accent-red)', burst: 'var(--accent-amber)', sustained: 'var(--accent-green)' };
 
     const totalDamage    = phaseResults.reduce((a, p) => a + p.totalDamage, 0);
@@ -1203,17 +1206,17 @@ function renderMultiStageSummary(phaseResults) {
         return `<div class="dur-item-row">
             <span class="dur-item-label">${label}${carryTag}</span>
             <div class="dur-bar-track"><div class="dur-bar-fill ${cls}" style="width:${usedPct}%"></div></div>
-            <span class="dur-item-pct ${remAbs > 0 ? 'dur-ok' : 'dur-depleted'}">${remPct}% restante</span>
+            <span class="dur-item-pct ${remAbs > 0 ? 'dur-ok' : 'dur-depleted'}">${remPct}% ${t('stats.remaining')}</span>
         </div>`;
     }
 
     const durRows = phaseResults.map(p => {
         const phColor = phaseColorVar[p.phase];
         const wRows = p.weaponResults.map(wr =>
-            durRow(`Arma ${wr.weapon.name || '?'}`, wr.durabilityUsed, wr.startingDurability, true)
+            durRow(`${t('equip.weapon')} ${wr.weapon.name || '?'}`, wr.durabilityUsed, wr.startingDurability, true)
         ).join('');
         const lRows = p.loadoutResults.map(lr =>
-            durRow(`Armadura ${lr.loadout.name || '?'}`, lr.durabilityUsed, lr.startingDurability, false)
+            durRow(`${t('stats.armor')} ${lr.loadout.name || '?'}`, lr.durabilityUsed, lr.startingDurability, false)
         ).join('');
         return `<div class="dur-phase-label" style="color:${phColor}">${phaseLabels[p.phase]}</div>${wRows}${lRows}`;
     }).join('<div class="summary-divider"></div>');
@@ -1253,7 +1256,7 @@ function renderMultiStageSummary(phaseResults) {
             totalCostOnly += lCost;
 
             if (lCost > 0) costRows += `<div class="cost-row">
-                <span class="cost-label">Armadura ${lr.loadout.name||'?'} (${pLabel})</span>
+                <span class="cost-label">${t('stats.armor')} ${lr.loadout.name||'?'} (${pLabel})</span>
                 <span class="cost-value cost-negative">-${lCost.toFixed(2)}cc</span>
             </div>`;
         });
@@ -1278,17 +1281,15 @@ function renderMultiStageSummary(phaseResults) {
         bountyGained = (totalDamage / 1000) * state.battle.bountyPerKDamage;
     }
 
-    // Cases
+    // Cases — probability-based: each accurate hit has loot% chance for case1, loot/100% for case2
     const lootChance = calculateStats.loot(state.skills.loot);
-    const casesFromHits = Math.floor((totalHits * lootChance) / 100);
-    const damageInK = totalDamage / 1000;
-    const rankingChance = (damageInK * 2.5) * 2.5;
-    const guaranteedCases = Math.floor(rankingChance / 100);
-    const remainderChance = rankingChance % 100;
-    const casesFromRanking = guaranteedCases + (remainderChance >= 50 ? 1 : 0);
+    const accurateHits = totalHits - totalMiss;
+    const case1Count = accurateHits * (lootChance / 100);          // expected case1 drops
+    const case2Count = accurateHits * (lootChance / 10000);        // expected case2 drops (rare)
     const caseGainsEnabled = document.getElementById('caseGainsEnabled').checked;
-    const coinPerCase = parseFloat(document.getElementById('coinPerCase').value) || 4;
-    const gainsFromCases = caseGainsEnabled ? (casesFromHits + casesFromRanking) * coinPerCase : 0;
+    const coinPerCase  = parseFloat(document.getElementById('coinPerCase').value) || 4;
+    const coinPerCase2 = parseFloat(document.getElementById('coinPerCase2').value) || 33;
+    const gainsFromCases = caseGainsEnabled ? (case1Count * coinPerCase + case2Count * coinPerCase2) : 0;
 
     // Scraps
     const scrapGainsEnabled = document.getElementById('scrapGainsEnabled').checked;
@@ -1317,7 +1318,7 @@ function renderMultiStageSummary(phaseResults) {
                 <div class="summary-card-header"><span>Combat Stats</span></div>
                 <div class="summary-card-body">
                     <div class="summary-stat-main">
-                        <span class="stat-label">Dano Total</span>
+                        <span class="stat-label">${t('stats.totalDamage')}</span>
                         <span class="stat-value-large">${formatDamage(totalDamage)}</span>
                     </div>
                     ${totalMin !== totalMax ? `<div class="summary-stat summary-stat-sub">
@@ -1335,40 +1336,39 @@ function renderMultiStageSummary(phaseResults) {
                     <div class="summary-stat"><span class="stat-label">Crits</span><span class="stat-value">${totalCrit}</span></div>
                     <div class="summary-stat"><span class="stat-label">Dodges</span><span class="stat-value">${totalDodge}</span></div>
                     <div class="summary-divider"></div>
-                    <div class="summary-stat"><span class="stat-label">Hit Médio</span><span class="stat-value" style="color:var(--accent-amber)">${formatDamage(overallAvgHit)}</span></div>
-                    <div class="summary-stat"><span class="stat-label">Hit Máximo</span><span class="stat-value" style="color:var(--accent-green)">${formatDamage(overallMaxHit)}</span></div>
+                    <div class="summary-stat"><span class="stat-label">${t('stats.avgHit')}</span><span class="stat-value" style="color:var(--accent-amber)">${formatDamage(overallAvgHit)}</span></div>
+                    <div class="summary-stat"><span class="stat-label">${t('stats.maxHit')}</span><span class="stat-value" style="color:var(--accent-green)">${formatDamage(overallMaxHit)}</span></div>
                     <div class="summary-divider"></div>
                     <div class="summary-stat">
-                        <span class="stat-label">Custo / 1K Dano</span>
+                        <span class="stat-label">${t('stats.costPer1k')}</span>
                         <span class="stat-value cost-negative">-${totalDamage > 0 ? (totalCostOnly / (totalDamage / 1000)).toFixed(2) : '0.00'}cc</span>
                     </div>
                     <div class="summary-stat">
-                        <span class="stat-label">Custo / 1K Dano (Liq.)</span>
+                        <span class="stat-label">${t('stats.costPer1kNet')}</span>
                         <span class="stat-value ${totalCost >= 0 ? 'cost-negative' : 'cost-bounty'}">${totalCost >= 0 ? '-' : '+'}${totalDamage > 0 ? Math.abs(totalCost / (totalDamage / 1000)).toFixed(2) : '0.00'}cc</span>
                     </div>
                 </div>
             </div>
 
             <div class="summary-card">
-                <div class="summary-card-header"><span>Durabilidade Restante</span></div>
+                <div class="summary-card-header"><span>${t('stats.durabilityRemaining')}</span></div>
                 <div class="summary-card-body">
                     ${durRows}
                 </div>
             </div>
 
             <div class="summary-card summary-card-full">
-                <div class="summary-card-header"><span>Custo da Batalha</span></div>
+                <div class="summary-card-header"><span>${t('stats.battleCost')}</span></div>
                 <div class="summary-card-body">
                     ${costRows}
                     ${foodCost > 0 ? `<div class="cost-row"><span class="cost-label">Comida</span><span class="cost-value cost-negative">-${foodCost.toFixed(2)}cc</span></div>` : ''}
                     <div class="cost-row">
-                        <span class="cost-label" style="font-weight:600;font-size:13px">Custo Total</span>
+                        <span class="cost-label" style="font-weight:600;font-size:13px">${t('stats.totalCost')}</span>
                         <span class="cost-value cost-negative" style="font-weight:600;font-size:13px">-${totalCostOnly.toFixed(2)}cc</span>
                     </div>
                     <div class="summary-divider"></div>
-                    <div class="cost-row"><span class="cost-label">Cases (hits)</span><span class="cost-value">${casesFromHits} cases</span></div>
-                    <div class="cost-row"><span class="cost-label">Cases (ranking, est.)</span><span class="cost-value">${casesFromRanking} cases</span></div>
-                    <div class="cost-row"><span class="cost-label">Ganho de Cases</span><span class="cost-value cost-bounty">+${gainsFromCases.toFixed(2)}cc</span></div>
+                    <div class="cost-row"><span class="cost-label">📦 Case (${case1Count.toFixed(1)} × ${coinPerCase}cc)</span><span class="cost-value cost-bounty">+${(case1Count * coinPerCase).toFixed(2)}cc</span></div>
+                    <div class="cost-row"><span class="cost-label">📦 Case Rara (${case2Count.toFixed(2)} × ${coinPerCase2}cc)</span><span class="cost-value cost-bounty">+${(case2Count * coinPerCase2).toFixed(2)}cc</span></div>
                     <div class="cost-row"><span class="cost-label">Ganho de Scraps (${Math.round(totalScraps)})</span><span class="cost-value cost-bounty">+${gainsFromScraps.toFixed(2)}cc</span></div>
                     <div class="cost-row"><span class="cost-label">Bounty</span><span class="cost-value cost-bounty">+${bountyGained.toFixed(2)}cc</span></div>
                     <div class="cost-row cost-total">
@@ -1746,19 +1746,15 @@ function renderBattleSummary(concatPrePillHits, concatBurstHits, concatSustained
         bountyGained = (result.totalDamage / 1000) * bountyPerK;
     }
     
-    // Calculate case gains
+    // Calculate case gains — probability-based per accurate hit
     const lootChance = calculateStats.loot(state.skills.loot);
-    const casesFromHits = Math.floor((result.hits * lootChance) / 100);
-    
-    const damageInK = result.totalDamage / 1000;
-    const rankingChance = (damageInK * 2.5) * 2.5; 
-    const guaranteedCases = Math.floor(rankingChance / 100);
-    const remainderChance = rankingChance % 100;
-    const casesFromRanking = guaranteedCases + (remainderChance >= 50 ? 1 : 0);
-    
+    const accurateHitsSingle = result.hits - result.misses;
+    const case1CountSingle = accurateHitsSingle * (lootChance / 100);
+    const case2CountSingle = accurateHitsSingle * (lootChance / 10000);
     const caseGainsEnabled = document.getElementById('caseGainsEnabled').checked;
-    const coinPerCase = parseFloat(document.getElementById('coinPerCase').value) || 4;
-    const gainsFromCases = caseGainsEnabled ? (casesFromHits + casesFromRanking) * coinPerCase : 0;
+    const coinPerCase  = parseFloat(document.getElementById('coinPerCase').value) || 4;
+    const coinPerCase2 = parseFloat(document.getElementById('coinPerCase2').value) || 33;
+    const gainsFromCases = caseGainsEnabled ? (case1CountSingle * coinPerCase + case2CountSingle * coinPerCase2) : 0;
     
     // Calculate scrap gains
     const scrapGainsEnabled = document.getElementById('scrapGainsEnabled').checked;
@@ -2204,12 +2200,10 @@ function init() {
     default_bonuses = state.bonuses;
     default_flags = state.featureFlags;
     default_battle = state.battle;
-    const savedBuildName = localStorage.getItem("warera-current-build") || "";
-    const builds = localStorage.getObject("warera-builds") || {};
-    if (savedBuildName && builds[savedBuildName]) {
-        state = JSON.parse(JSON.stringify(builds[savedBuildName]));
-    } else {
-        state = localStorage.getObject("warera-state") || state;
+    // Always load latest state (includes unsaved changes)
+    const savedState = localStorage.getObject("warera-state");
+    if (savedState) {
+        state = savedState;
     }
     console.log("Initial state:");
     console.dir(state);
@@ -2279,6 +2273,9 @@ function init() {
     
     if (state.battle.coinPerCase === null || state.battle.coinPerCase === undefined) {
         state.battle.coinPerCase = 4;
+    }
+    if (state.battle.coinPerCase2 === null || state.battle.coinPerCase2 === undefined) {
+        state.battle.coinPerCase2 = 33;
     }
     
     if (state.battle.scrapGainsEnabled === null || state.battle.scrapGainsEnabled === undefined) {
@@ -2411,6 +2408,7 @@ function init() {
     document.getElementById('bountyPerKDamage').value = state.battle.bountyPerKDamage || 0.5;
     document.getElementById('caseGainsEnabled').checked = state.battle.caseGainsEnabled || false;
     document.getElementById('coinPerCase').value = state.battle.coinPerCase || 4;
+    document.getElementById('coinPerCase2').value = state.battle.coinPerCase2 || 33;
     document.getElementById('scrapGainsEnabled').checked = state.battle.scrapGainsEnabled !== undefined ? state.battle.scrapGainsEnabled : true;
     document.getElementById('coinPerScrap').value = state.battle.coinPerScrap || 0.3;
     document.getElementById('damageSummary').style.display = 'none';
@@ -2580,6 +2578,15 @@ function init() {
 
 document.addEventListener('DOMContentLoaded', function() {
     init();
+    // Auto-save every 30 seconds to protect against crashes/refreshes
+    setInterval(() => { try { saveState(); } catch(e) {} }, 30000);
+    // Save on page unload (refresh, close, navigate away)
+    window.addEventListener('beforeunload', () => { try { saveState(); } catch(e) {} });
+    // Restore saved language
+    const savedLang = localStorage.getItem('warera-lang') || 'pt';
+    const langSelect = document.getElementById('langSelect');
+    if (langSelect) langSelect.value = savedLang;
+    setLanguage(savedLang);
     document.addEventListener('click', () => setTimeout(updateBuildDirtyIndicator, 50));
     document.addEventListener('input', () => setTimeout(updateBuildDirtyIndicator, 50));
 });
@@ -2745,6 +2752,10 @@ document.getElementById('caseGainsEnabled').addEventListener("change", (event) =
 
 document.getElementById('coinPerCase').addEventListener("input", (event) => {
     state.battle.coinPerCase = parseFloat(event.target.value) || 4;
+});
+
+document.getElementById('coinPerCase2').addEventListener("input", (event) => {
+    state.battle.coinPerCase2 = parseFloat(event.target.value) || 33;
 });
 
 document.getElementById('scrapGainsEnabled').addEventListener("change", (event) => {
@@ -3060,7 +3071,8 @@ function updateHealthTrail() {
     const food = (loadout0 && loadout0.food) ? loadout0.food : (state.buffs ? state.buffs.food : null);
     const foodBonus = food ? buffs.food[food] : 0;
     const foodHpPerUnit = food ? Math.floor(baseHP * foodBonus / 100) : 0;
-    const foodLabel = food ? food.charAt(0).toUpperCase() + food.slice(1) : null;
+    const foodLabelMap = { bread: 'food.bread', steak: 'food.steak', fish: 'food.fish' };
+    const foodLabel = food ? t(foodLabelMap[food] || 'food.none') : null;
 
     // Full HP (with food)
     const fullHp = baseHP + foodHpPerUnit * hungerCap;
@@ -3109,71 +3121,71 @@ function updateHealthTrail() {
 
     container.innerHTML = `
     <div class="ht-header">
-        Recuperação de HP
-        <span class="ht-regen-rate">+${hpPerHour.toFixed(1)} HP/hr · ${hungerPerHour.toFixed(1)} fome/hr</span>
+        ${t('hp.recovery')}
+        <span class="ht-regen-rate">+${hpPerHour.toFixed(1)} ${t('hp.hpHr')} · ${hungerPerHour.toFixed(1)} ${t('hp.hungerHr')}</span>
     </div>
     <div class="ht-legend">
-        <span class="ht-legend-item"><span class="ht-legend-dot" style="background:var(--accent-red)"></span>HP base (${baseHP})</span>
+        <span class="ht-legend-item"><span class="ht-legend-dot" style="background:var(--accent-red)"></span>${t('hp.hpBase')} (${baseHP})</span>
         ${legendFood}
-        <span class="ht-legend-item"><span class="ht-legend-dot" style="background:var(--bg-overlay);border:1px solid var(--border-strong)"></span>Fome recuperada</span>
+        <span class="ht-legend-item"><span class="ht-legend-dot" style="background:rgba(180,180,180,0.4);border:1px solid rgba(220,220,220,0.6)"></span>${t('hp.hungerRecovered')}</span>
     </div>
     <div class="ht-timeline">
 
         <div class="ht-step">
-            <div class="ht-step-label">0h <span class="ht-tag ht-tag-neutral">Zerado</span></div>
+            <div class="ht-step-label">0h <span class="ht-tag ht-tag-neutral">${t('hp.zeroed')}</span></div>
             ${hpBar(baseHP, foodHpPerUnit * hungerCap, fullHp)}
             ${hungerDots(hungerCap, hungerCap)}
-            <div class="ht-step-nums">${fullHp} / ${fullHp} HP (potencial) &nbsp;·&nbsp; ${hungerCap} / ${hungerCap} fome</div>
-            <div class="ht-step-note">saiu da rodada com tudo zerado — começa a recuperar agora</div>
+            <div class="ht-step-nums">${fullHp} / ${fullHp} HP (${t('hp.potential')}) &nbsp;·&nbsp; ${hungerCap} / ${hungerCap} ${t('hp.hunger')}</div>
+            <div class="ht-step-note">${t('hp.exitedZeroed')}</div>
         </div>
 
         <div class="ht-energy-budget" style="border-color:rgba(120,120,120,0.3);background:rgba(120,120,120,0.05);margin-bottom:8px;">
-            <div class="ht-budget-label" style="color:var(--text-secondary)">Potencial máximo</div>
-            <div class="ht-budget-val">${fullHp} <span class="ht-budget-unit">HP quando full</span></div>
-            <div class="ht-budget-note">${baseHP} HP base${foodHpPerUnit > 0 ? ` + ${foodHpPerUnit * hungerCap} de ${foodLabel} (${hungerCap} fome)` : ''}</div>
+            <div class="ht-budget-label" style="color:var(--text-secondary)">${t('hp.maxPotential')}</div>
+            <div class="ht-budget-val">${fullHp} <span class="ht-budget-unit">${t('hp.hpWhenFull')}</span></div>
+            <div class="ht-budget-note">${baseHP} ${t('hp.hpBase2')}${foodHpPerUnit > 0 ? ` + ${foodHpPerUnit * hungerCap} ${t('hp.of')} ${foodLabel} (${hungerCap} ${t('hp.hunger')})` : ''}</div>
         </div>
 
         <div class="ht-connector">
             <span class="ht-connector-line"></span>
-            <span class="ht-connector-label">recuperando ${hpPerHour.toFixed(1)} HP/hr${foodHpPerUnit > 0 ? ` + ${foodLabel}` : ''}…</span>
+            <span class="ht-connector-label">${t('hp.recovering')} ${hpPerHour.toFixed(1)} ${t('hp.hpHr')}${foodHpPerUnit > 0 ? ` + ${foodLabel}` : ''}…</span>
         </div>
 
         <div class="ht-step ht-step-pill">
-            <div class="ht-step-label">${prePillHours}h <span class="ht-tag ht-tag-pill">Toma a pílula</span></div>
+            <div class="ht-step-label">${prePillHours}h <span class="ht-tag ht-tag-pill">${t('hp.takePill')}</span></div>
             ${hpBar(hpBaseAtPill, foodHpAtPill, fullHp)}
             ${hungerDots(hungerAtPill, hungerCap)}
-            <div class="ht-step-nums">${totalHpAtPill} / ${fullHp} HP (${hpPctAtPill}%) &nbsp;·&nbsp; ${hungerAtPill} / ${hungerCap} fome (${hungerPctAtPill}%)</div>
-            ${foodHpAtPill > 0 ? `<div class="ht-step-note">${hpBaseAtPill} HP base + <span class="ht-food-val">${foodHpAtPill} de ${foodLabel}</span> (${hungerAtPill} unid. de fome)</div>` : ''}
+            <div class="ht-step-nums">${totalHpAtPill} / ${fullHp} HP (${hpPctAtPill}%) &nbsp;·&nbsp; ${hungerAtPill} / ${hungerCap} ${t('hp.hunger')} (${hungerPctAtPill}%)</div>
+            ${foodHpAtPill > 0 ? `<div class="ht-step-note">${hpBaseAtPill} ${t('hp.hpBase2')} + <span class="ht-food-val">${foodHpAtPill} ${t('hp.of')} ${foodLabel}</span> (${hungerAtPill} ${t('hp.foodUnits')})</div>` : ''}
             ${hoursFromPillToFull > 0
-                ? `<div class="ht-step-note">faltam ${hoursFromPillToFull}h para HP base ficar full — mas o burst é agora</div>`
-                : '<div class="ht-step-note">HP já está full ao tomar a pílula ✓</div>'}
+                ? `<div class="ht-step-note">${t('hp.hoursToFull', hoursFromPillToFull)}</div>`
+                : `<div class="ht-step-note">${t('hp.alreadyFull')}</div>`}
         </div>
 
         <div class="ht-energy-budget ht-energy-burst">
-            <div class="ht-budget-label">Energia disponível — Burst (na pílula)</div>
-            <div class="ht-budget-val">${totalHpAtPill} <span class="ht-budget-unit">HP para gastar</span></div>
-            <div class="ht-budget-note">${hpPctAtPill}% do HP máximo${pillReached ? ' — já estava full' : ` — ${fullHp - totalHpAtPill} HP não recuperados`}</div>
+            <div class="ht-budget-label">${t('hp.energyBurst')}</div>
+            <div class="ht-budget-val">${totalHpAtPill} <span class="ht-budget-unit">${t('hp.hpToSpend')}</span></div>
+            <div class="ht-budget-note">${hpPctAtPill}% ${t('hp.ofMax')}${pillReached ? ` — ${t('hp.alreadyFullShort')}` : ` — ${fullHp - totalHpAtPill} ${t('hp.notRecovered')}`}</div>
         </div>
 
         <div class="ht-connector">
             <span class="ht-connector-line"></span>
-            <span class="ht-connector-label">burst → zerado → recuperando ${hpPerHour.toFixed(1)} HP/hr por ${sustainHours}h…</span>
+            <span class="ht-connector-label">${t('hp.burstZeroRecovering', hpPerHour.toFixed(1), sustainHours)}</span>
         </div>
 
         <div class="ht-step">
-            <div class="ht-step-label">${prePillHours + sustainHours}h <span class="ht-tag ht-tag-neutral">Sustentado</span></div>
+            <div class="ht-step-label">${prePillHours + sustainHours}h <span class="ht-tag ht-tag-neutral">${t('hp.sustained')}</span></div>
             ${hpBar(hpBaseSustain, foodHpSustain, fullHp)}
             ${hungerDots(hungerSustain, hungerCap)}
-            <div class="ht-step-nums">${totalHpSustain} / ${fullHp} HP (${Math.round(totalHpSustain / fullHp * 100)}%) &nbsp;·&nbsp; ${hungerSustain} / ${hungerCap} fome</div>
+            <div class="ht-step-nums">${totalHpSustain} / ${fullHp} HP (${Math.round(totalHpSustain / fullHp * 100)}%) &nbsp;·&nbsp; ${hungerSustain} / ${hungerCap} ${t('hp.hunger')}</div>
             ${totalHpSustain < fullHp
-                ? `<div class="ht-step-note">${fullHp - totalHpSustain} HP ainda por recuperar para chegar ao máximo</div>`
-                : `<div class="ht-step-note">HP estará full ao fim das ${sustainHours}h ✓</div>`}
+                ? `<div class="ht-step-note">${t('hp.stillToRecover', fullHp - totalHpSustain)}</div>`
+                : `<div class="ht-step-note">${t('hp.willBeFullAt', sustainHours)}</div>`}
         </div>
 
         <div class="ht-energy-budget ht-energy-sust">
-            <div class="ht-budget-label">Energia disponível — Sustentado</div>
-            <div class="ht-budget-val">${totalHpSustain} <span class="ht-budget-unit">HP para gastar</span></div>
-            <div class="ht-budget-note">${hpBaseSustain} HP base${foodHpSustain > 0 ? ` + ${foodHpSustain} de ${foodLabel} (${hungerSustain} fome)` : ''} · recuperado em ${sustainHours}h após burst</div>
+            <div class="ht-budget-label">${t('hp.energySustained')}</div>
+            <div class="ht-budget-val">${totalHpSustain} <span class="ht-budget-unit">${t('hp.hpToSpend')}</span></div>
+            <div class="ht-budget-note">${hpBaseSustain} ${t('hp.hpBase2')}${foodHpSustain > 0 ? ` + ${foodHpSustain} ${t('hp.of')} ${foodLabel} (${hungerSustain} ${t('hp.hunger')})` : ''} · ${t('hp.recoveredAfterBurst', sustainHours)}</div>
         </div>
 
     </div>`;
@@ -3796,9 +3808,9 @@ function renderStagePipeline() {
     const weapons = state.multiStage.weapons || [];
 
     const phases = [
-        { key: 'prePill',   label: 'Pré-pílula',  desc: 'Gasta toda a energia antes da pílula', cls: 'ms-phase-pre' },
-        { key: 'burst',     label: 'Burst',        desc: 'Descarga total pós-pílula',             cls: 'ms-phase-burst' },
-        { key: 'sustained', label: 'Sustentado',   desc: 'Restante das 8h',                       cls: 'ms-phase-sust' }
+        { key: 'prePill',   label: t('phase.prePill'),   desc: t('phase.prePill.desc'), cls: 'ms-phase-pre' },
+        { key: 'burst',     label: t('phase.burst'),     desc: t('phase.burst.desc'),   cls: 'ms-phase-burst' },
+        { key: 'sustained', label: t('phase.sustained'), desc: t('phase.sustained.desc'), cls: 'ms-phase-sust' }
     ];
 
     container.innerHTML = phases.map(ph => {
@@ -3807,14 +3819,14 @@ function renderStagePipeline() {
 
         const weaponTags = phWeapons.length
             ? phWeapons.map(w => `<span class="ms-phase-tag ms-phase-tag-weapon">${w.name || '?'}</span>`).join('')
-            : `<span class="ms-phase-tag ms-phase-tag-empty">Nenhuma arma</span>`;
+            : `<span class="ms-phase-tag ms-phase-tag-empty">${t('phase.noWeapon')}</span>`;
 
         const loadoutTags = phLoadouts.length
             ? phLoadouts.map(l => `<span class="ms-phase-tag ms-phase-tag-loadout">${l.name || '?'}</span>`).join('')
-            : `<span class="ms-phase-tag ms-phase-tag-empty">Nenhuma armadura</span>`;
+            : `<span class="ms-phase-tag ms-phase-tag-empty">${t('phase.noArmor')}</span>`;
 
         const warn = (phWeapons.length === 0 || phLoadouts.length === 0) && (phWeapons.length + phLoadouts.length > 0)
-            ? `<span class="ms-phase-warn">Fase incompleta</span>` : '';
+            ? `<span class="ms-phase-warn">${t('phase.incomplete')}</span>` : '';
 
         return `
         <div class="ms-phase-block ${ph.cls}">
@@ -3825,11 +3837,11 @@ function renderStagePipeline() {
             </div>
             <div class="ms-phase-block-body">
                 <div class="ms-phase-block-row">
-                    <span class="ms-phase-block-rowlabel">Armas</span>
+                    <span class="ms-phase-block-rowlabel">${t('phase.weapons')}</span>
                     <div class="ms-phase-tags">${weaponTags}</div>
                 </div>
                 <div class="ms-phase-block-row">
-                    <span class="ms-phase-block-rowlabel">Armaduras</span>
+                    <span class="ms-phase-block-rowlabel">${t('phase.armors')}</span>
                     <div class="ms-phase-tags">${loadoutTags}</div>
                 </div>
             </div>
@@ -4110,9 +4122,10 @@ function runOptimizer() {
     if (_optimizerWorker) { _optimizerWorker.terminate(); _optimizerWorker = null; }
 
     const speedMap = {
-        fast:     { popSize: 100, nGen: 80  },
-        normal:   { popSize: 200, nGen: 150 },
-        thorough: { popSize: 300, nGen: 250 }
+        fast:     { popSize: 150, nGen: 100 },
+        normal:   { popSize: 300, nGen: 200 },
+        thorough: { popSize: 500, nGen: 400 },
+        ultra:    { popSize: 800, nGen: 600 }
     };
     const speed = document.getElementById('optSpeed').value;
     const { popSize, nGen } = speedMap[speed] || speedMap.normal;
@@ -4141,7 +4154,7 @@ function runOptimizer() {
     document.getElementById('optProgressWrap').style.display = '';
     document.getElementById('optProgressFill').style.width = '0%';
     document.getElementById('optProgressLabel').textContent = '0%';
-    document.getElementById('optResults').innerHTML = '<div class="opt-hint">Rodando otimização…</div>';
+    document.getElementById('optResults').innerHTML = `<div class="opt-hint">${t('opt.running')}</div>`;
 
     _optimizerWorker = new Worker('optimizer.js');
     _optimizerWorker.onmessage = function(e) {
@@ -4156,8 +4169,8 @@ function runOptimizer() {
             _optimizerWorker = null;
         } else if (type === 'error') {
             runBtn.disabled = false;
-            runBtn.textContent = '▶ EXECUTAR';
-            document.getElementById('optResults').innerHTML = `<div class="opt-hint opt-error">Erro: ${message}</div>`;
+            runBtn.textContent = t('opt.run');
+            document.getElementById('optResults').innerHTML = `<div class="opt-hint opt-error">${t('opt.error', message)}</div>`;
             _optimizerWorker = null;
         }
     };
@@ -4178,12 +4191,13 @@ function renderOptimizerResults(pareto, cfg) {
             // show closest to target
             candidates = [...pareto].sort((a, b) => Math.abs(a.damage - cfg.targetDamage) - Math.abs(b.damage - cfg.targetDamage)).slice(0, 5);
         } else {
-            candidates.sort((a, b) => a.cost - b.cost); // cheapest first
+            candidates.sort((a, b) => a.gearCost - b.gearCost); // cheapest gear first
         }
     } else {
-        candidates = pareto.filter(b => b.cost <= cfg.budgetCap);
+        // Budget mode: filter by gear cost (weapons + armor + food only, no ammo/pill)
+        candidates = pareto.filter(b => b.gearCost <= cfg.budgetCap);
         if (candidates.length === 0) {
-            candidates = [...pareto].sort((a, b) => a.cost - b.cost).slice(0, 5);
+            candidates = [...pareto].sort((a, b) => a.gearCost - b.gearCost).slice(0, 5);
         } else {
             candidates.sort((a, b) => b.damage - a.damage); // most damage first
         }
@@ -4196,12 +4210,12 @@ function renderOptimizerResults(pareto, cfg) {
 
     const gearBlock = (g, label) => `
         ${label ? `<div class="opt-phase-gear-label">${label}</div>` : ''}
-        <div class="opt-gear-row">${rarityDot(g.weapon.rarity)}<span class="opt-gear-label">Arma</span><span class="opt-gear-val">${g.weapon.rarity} (${g.weapon.primary}atk/${g.weapon.secondary}cc)</span></div>
-        <div class="opt-gear-row">${rarityDot(g.helmet.rarity)}<span class="opt-gear-label">Capacete</span><span class="opt-gear-val">${g.helmet.rarity} (${g.helmet.stat}%)</span></div>
-        <div class="opt-gear-row">${rarityDot(g.chest.rarity)}<span class="opt-gear-label">Peitoral</span><span class="opt-gear-val">${g.chest.rarity} (${g.chest.stat}%)</span></div>
-        <div class="opt-gear-row">${rarityDot(g.pants.rarity)}<span class="opt-gear-label">Calça</span><span class="opt-gear-val">${g.pants.rarity} (${g.pants.stat}%)</span></div>
-        <div class="opt-gear-row">${rarityDot(g.boots.rarity)}<span class="opt-gear-label">Botas</span><span class="opt-gear-val">${g.boots.rarity} (${g.boots.stat}%)</span></div>
-        <div class="opt-gear-row">${rarityDot(g.gloves.rarity)}<span class="opt-gear-label">Luvas</span><span class="opt-gear-val">${g.gloves.rarity} (${g.gloves.stat}%)</span></div>`;
+        <div class="opt-gear-row">${rarityDot(g.weapon.rarity)}<span class="opt-gear-label">${t('equip.weapon')}</span><span class="opt-gear-val"><b>${g.weapon.rarity}</b></span></div>
+        <div class="opt-gear-row">${rarityDot(g.helmet.rarity)}<span class="opt-gear-label">${t('equip.helmet')}</span><span class="opt-gear-val"><b>${g.helmet.rarity}</b></span></div>
+        <div class="opt-gear-row">${rarityDot(g.chest.rarity)}<span class="opt-gear-label">${t('equip.chest')}</span><span class="opt-gear-val"><b>${g.chest.rarity}</b></span></div>
+        <div class="opt-gear-row">${rarityDot(g.pants.rarity)}<span class="opt-gear-label">${t('equip.pants')}</span><span class="opt-gear-val"><b>${g.pants.rarity}</b></span></div>
+        <div class="opt-gear-row">${rarityDot(g.boots.rarity)}<span class="opt-gear-label">${t('equip.boots')}</span><span class="opt-gear-val"><b>${g.boots.rarity}</b></span></div>
+        <div class="opt-gear-row">${rarityDot(g.gloves.rarity)}<span class="opt-gear-label">${t('equip.gloves')}</span><span class="opt-gear-val"><b>${g.gloves.rarity}</b></span></div>`;
 
     const cards = top.map((b, i) => {
         const skillBudget = cfg.level * 4;
@@ -4213,9 +4227,9 @@ function renderOptimizerResults(pareto, cfg) {
 
         const gearSection = b.multiPhase
             ? `<div class="opt-multiphase-gear">
-                   <div class="opt-phase-section">${gearBlock(b.gearPrePill, 'Pré-pílula')}</div>
-                   <div class="opt-phase-section">${gearBlock(b.gearBurst, 'Burst')}</div>
-                   <div class="opt-phase-section">${gearBlock(b.gearSustained, 'Sustentado')}</div>
+                   <div class="opt-phase-section">${gearBlock(b.gearPrePill, t('phase.prePill'))}</div>
+                   <div class="opt-phase-section">${gearBlock(b.gearBurst, t('phase.burst'))}</div>
+                   <div class="opt-phase-section">${gearBlock(b.gearSustained, t('phase.sustained'))}</div>
                </div>`
             : `<div class="opt-gear-list">${gearBlock(b.gear, '')}</div>`;
 
@@ -4223,25 +4237,25 @@ function renderOptimizerResults(pareto, cfg) {
         const statsBlock = (s, label) => {
             if (!s) return '';
             const precLine = s.rawHitChance > 100
-                ? `<span>🎯 Precisão bruta</span><span>${s.rawHitChance}% → <span style="color:var(--accent-amber)">+${s.precOverflowAtk} ATK overflow</span></span>`
-                : `<span>🎯 Precisão</span><span>${s.rawHitChance}%</span>`;
+                ? `<span>${t('opt.stat.rawPrec')}</span><span>${s.rawHitChance}% → <span style="color:var(--accent-amber)">${t('opt.stat.precOverflow', s.precOverflowAtk)}</span></span>`
+                : `<span>${t('opt.stat.precision')}</span><span>${s.rawHitChance}%</span>`;
             return `<div class="opt-stats-block">
                 ${label ? `<div class="opt-stats-label">${label}</div>` : ''}
                 <div class="opt-stats-grid">
-                    <span>⚔ ATK final</span><span>${s.atk}</span>
+                    <span>${t('opt.stat.atkFinal')}</span><span>${s.atk}</span>
                     ${precLine}
-                    <span>💥 Crit chance</span><span>${s.critChance}%</span>
-                    <span>📈 Crit dano</span><span>${s.critDmgPct}%</span>
-                    <span>🛡 Armadura</span><span>${s.armorPct}%</span>
-                    <span>💨 Esquiva</span><span>${s.dodgePct}%</span>
-                    <span>❤ HP disponível</span><span>${s.hp}</span>
-                    <span>⚡ Dano recebido/hit</span><span>${s.dmgPerRound}</span>
-                    <span>🔢 Nº ataques</span><span>${s.nHits}</span>
-                    <span>🗡 Dano/ataque (EV)</span><span>${s.eDmgPerHit}</span>
-                    <span>🔧 Dur. arma usada</span><span>${s.wDurUsed}%</span>
-                    <span>🔧 Dur. armor usada</span><span>${s.aDurUsed.toFixed(1)}%</span>
-                    <span>💰 Custo fase</span><span>${s.cost}cc</span>
-                    <span>🎯 Dano fase</span><span>${fmt(s.damage)}</span>
+                    <span>${t('opt.stat.critChance')}</span><span>${s.critChance}%</span>
+                    <span>${t('opt.stat.critDmg')}</span><span>${s.critDmgPct}%</span>
+                    <span>${t('opt.stat.armor')}</span><span>${s.armorPct}%</span>
+                    <span>${t('opt.stat.dodge')}</span><span>${s.dodgePct}%</span>
+                    <span>${t('opt.stat.hpAvailable')}</span><span>${s.hp}</span>
+                    <span>${t('opt.stat.dmgPerHit')}</span><span>${s.dmgPerRound}</span>
+                    <span>${t('opt.stat.numAttacks')}</span><span>${s.nHits}</span>
+                    <span>${t('opt.stat.dmgPerAttack')}</span><span>${s.eDmgPerHit}</span>
+                    <span>${t('opt.stat.weaponDur')}</span><span>${s.wDurUsed}%</span>
+                    <span>${t('opt.stat.armorDur')}</span><span>${s.aDurUsed.toFixed(1)}%</span>
+                    <span>${t('opt.stat.phaseCost')}</span><span>${s.cost}cc</span>
+                    <span>${t('opt.stat.phaseDmg')}</span><span>${fmt(s.damage)}</span>
                 </div>
             </div>`;
         };
@@ -4249,14 +4263,14 @@ function renderOptimizerResults(pareto, cfg) {
         let statsSection = '';
         if (b.phaseStats) {
             if (b.multiPhase) {
-                statsSection = `<details class="opt-stats-details"><summary>Ver stats detalhados</summary>
-                    ${statsBlock(b.phaseStats.prePill, 'Pré-pílula')}
-                    ${statsBlock(b.phaseStats.burst, 'Burst')}
-                    ${statsBlock(b.phaseStats.sustained, 'Sustentado')}
+                statsSection = `<details class="opt-stats-details"><summary>${t('opt.viewStats')}</summary>
+                    ${statsBlock(b.phaseStats.prePill, t('phase.prePill'))}
+                    ${statsBlock(b.phaseStats.burst, t('phase.burst'))}
+                    ${statsBlock(b.phaseStats.sustained, t('phase.sustained'))}
                 </details>`;
             } else {
                 const ph = Object.keys(b.phaseStats)[0];
-                statsSection = `<details class="opt-stats-details"><summary>Ver stats detalhados</summary>
+                statsSection = `<details class="opt-stats-details"><summary>${t('opt.viewStats')}</summary>
                     ${statsBlock(b.phaseStats[ph], '')}
                 </details>`;
             }
@@ -4267,7 +4281,7 @@ function renderOptimizerResults(pareto, cfg) {
             <div class="opt-card-header">
                 <span class="opt-card-rank">#${i + 1}${i === 0 ? ' ★' : ''}</span>
                 <span class="opt-card-damage">${fmt(b.damage)} dano</span>
-                <span class="opt-card-cost">${b.cost.toFixed(1)}cc</span>
+                <span class="opt-card-cost">${b.gearCost.toFixed(1)}cc</span>
                 <button class="opt-apply-btn" onclick="applyOptimizerBuild(${i})">Aplicar</button>
             </div>
             <div class="opt-card-body">
@@ -4284,8 +4298,8 @@ function renderOptimizerResults(pareto, cfg) {
     }).join('');
 
     const modeInfo = mode === 'damage'
-        ? `<div class="opt-result-info">Builds com dano ≥ ${fmt(cfg.targetDamage)}, ordenadas pelo menor custo</div>`
-        : `<div class="opt-result-info">Builds com custo ≤ ${cfg.budgetCap}cc, ordenadas pelo maior dano</div>`;
+        ? `<div class="opt-result-info">${t('opt.buildsAboveDmg', fmt(cfg.targetDamage))}</div>`
+        : `<div class="opt-result-info">${t('opt.buildsUnderBudget', cfg.budgetCap)}</div>`;
 
     document.getElementById('optResults').innerHTML = modeInfo + cards;
     // store results for applyOptimizerBuild
@@ -4379,32 +4393,134 @@ function applyOptimizerBuild(index) {
     const rarityLabel = { Cinza:'Cin', Verde:'Vrd', Azul:'Azl', Roxo:'Rxo', Amarelo:'Aml', Vermelho:'Verm' };
 
     if (b.multiPhase) {
-        // 3 loadouts — one per phase, each with its own armor set
-        while (ldts.length < 3) ldts.push(JSON.parse(JSON.stringify(getDefaultLoadout())));
-        applyGearToLoadout(ldts[0], b.gearPrePill);   ldts[0].phases = ['prePill'];   ldts[0].pill = false;
-        applyGearToLoadout(ldts[1], b.gearBurst);     ldts[1].phases = ['burst'];     ldts[1].pill = true;
-        applyGearToLoadout(ldts[2], b.gearSustained); ldts[2].phases = ['sustained']; ldts[2].pill = true;
-        ldts.splice(3);
-
-        // Weapons: one entry per weapon needed per phase, named by rarity
-        wl.length = 0;
         const phaseGear = [
-            { phase: 'prePill',   gear: b.gearPrePill   },
-            { phase: 'burst',     gear: b.gearBurst     },
-            { phase: 'sustained', gear: b.gearSustained }
+            { key: 'prePill',   gear: b.gearPrePill,   pill: false },
+            { key: 'burst',     gear: b.gearBurst,     pill: true  },
+            { key: 'sustained', gear: b.gearSustained, pill: true  }
         ];
-        for (const { phase, gear } of phaseGear) {
-            const n   = weaponCount(phase);
-            const lbl = rarityLabel[gear.weapon.rarity] || gear.weapon.rarity;
+
+        // --- Weapons: per phase, with shared boundary weapon when consecutive phases use same rarity ---
+        // First pass: compute carry-over per phase using optimizer stats
+        const phaseNHits = phaseGear.map(pg => {
+            const ps = b.phaseStats && b.phaseStats[pg.key];
+            return ps ? ps.nHits : 100;
+        });
+        // wDurRemaining[i] = weapon durability left after phase i
+        const wDurAfter = [];
+        for (let pi = 0; pi < phaseGear.length; pi++) {
+            const hits = phaseNHits[pi];
+            // Carry-over from previous phase if same weapon rarity
+            const carryIn = (pi > 0 && phaseGear[pi].gear.weapon.idx === phaseGear[pi-1].gear.weapon.idx)
+                ? wDurAfter[pi-1] : 0;
+            // Remaining after consuming hits: first use carryIn, then fresh 100-dur weapons
+            const afterCarry = hits - carryIn;
+            if (afterCarry <= 0) {
+                wDurAfter[pi] = carryIn - hits; // didn't even need a new weapon
+            } else {
+                wDurAfter[pi] = (100 - (afterCarry % 100)) % 100;
+            }
+        }
+
+        // Second pass: create weapon entries
+        wl.length = 0;
+        for (let pi = 0; pi < phaseGear.length; pi++) {
+            const pg    = phaseGear[pi];
+            const hits  = phaseNHits[pi];
+            const lbl   = rarityLabel[pg.gear.weapon.rarity] || pg.gear.weapon.rarity;
+            const wCost = wCosts[rarityMap[pg.gear.weapon.rarity] || 'gray'] || pg.gear.weapon.cost;
+
+            // Carry-over from previous phase?
+            const prevSame = (pi > 0 && phaseGear[pi].gear.weapon.idx === phaseGear[pi-1].gear.weapon.idx);
+            const carryIn  = prevSame ? wDurAfter[pi-1] : 0;
+
+            // How many NEW weapons this phase needs (carry-over provides free hits)
+            const hitsToPayFor = Math.max(0, hits - carryIn);
+            const n = hitsToPayFor > 0 ? Math.ceil(hitsToPayFor / 100) : 0;
+
+            // Check if next phase uses same rarity → last weapon becomes boundary
+            const nextPg = phaseGear[pi + 1];
+            const shareWithNext = nextPg && nextPg.gear.weapon.idx === pg.gear.weapon.idx;
+
             for (let k = 0; k < n; k++) {
+                const isLast = (k === n - 1);
+                const phases = [pg.key];
+                if (isLast && shareWithNext) {
+                    phases.push(nextPg.key);
+                }
                 wl.push({
                     name:      `${lbl} ${k + 1}/${n}`,
-                    primary:   gear.weapon.primary,
-                    secondary: gear.weapon.secondary,
-                    cost:      wCosts[rarityMap[gear.weapon.rarity] || 'gray'] || gear.weapon.cost,
-                    phases:    [phase]
+                    primary:   pg.gear.weapon.primary,
+                    secondary: pg.gear.weapon.secondary,
+                    cost:      wCost,
+                    phases
                 });
             }
+
+            // If no new weapons but carry-over covers everything, the boundary weapon
+            // from previous phase already has this phase in its phases[] — no extra needed
+        }
+
+        // --- Loadouts: per phase, with carry-over when same or superior armor set ---
+        // armorMatch: true if next phase armor is same or lower rarity (can reuse current)
+        function armorCanCarry(gCur, gNext) {
+            return gCur.helmet.idx >= gNext.helmet.idx &&
+                   gCur.chest.idx  >= gNext.chest.idx  &&
+                   gCur.pants.idx  >= gNext.pants.idx  &&
+                   gCur.boots.idx  >= gNext.boots.idx  &&
+                   gCur.gloves.idx >= gNext.gloves.idx;
+        }
+
+        // Compute armor dur used per phase (aDurUsed from stats)
+        const phaseADur = phaseGear.map(pg => {
+            const ps = b.phaseStats && b.phaseStats[pg.key];
+            return ps ? ps.aDurUsed : 100;
+        });
+
+        // Carry-over tracking for armor
+        const aDurAfter = [];
+        for (let pi = 0; pi < phaseGear.length; pi++) {
+            const durUsed = phaseADur[pi];
+            const prevCanCarry = (pi > 0 && armorCanCarry(phaseGear[pi-1].gear, phaseGear[pi].gear));
+            const carryIn = prevCanCarry ? Math.max(0, aDurAfter[pi-1]) : 0;
+
+            // If carry-over covers the dur needed, no new loadout required
+            aDurAfter[pi] = carryIn > 0 ? (carryIn - durUsed) : (100 - durUsed);
+        }
+
+        ldts.length = 0;
+        for (let pi = 0; pi < phaseGear.length; pi++) {
+            const pg = phaseGear[pi];
+            const prevCanCarry = (pi > 0 && armorCanCarry(phaseGear[pi-1].gear, phaseGear[pi].gear));
+            const carryIn = prevCanCarry ? Math.max(0, aDurAfter[pi-1] + phaseADur[pi]) : 0;
+
+            // If previous phase left enough durability (>1%), skip creating a new loadout
+            // The boundary loadout from previous phase already covers this phase
+            if (prevCanCarry && carryIn > 1) {
+                // Already covered by previous phase's shared loadout — no new loadout needed
+                continue;
+            }
+
+            const ldt = JSON.parse(JSON.stringify(getDefaultLoadout()));
+            applyGearToLoadout(ldt, pg.gear);
+            ldt.phases = [pg.key];
+            ldt.pill   = pg.pill;
+
+            // Check if next phase can reuse this armor → share the loadout
+            const nextPg = phaseGear[pi + 1];
+            if (nextPg && armorCanCarry(pg.gear, nextPg.gear) && aDurAfter[pi] > 1) {
+                ldt.phases.push(nextPg.key);
+                if (nextPg.pill) ldt.pill = true;
+            }
+
+            ldts.push(ldt);
+        }
+        // Safety: ensure at least 1 loadout exists
+        if (ldts.length === 0) {
+            const ldt = JSON.parse(JSON.stringify(getDefaultLoadout()));
+            applyGearToLoadout(ldt, phaseGear[0].gear);
+            ldt.phases = ['prePill', 'burst', 'sustained'];
+            ldt.pill = true;
+            ldts.push(ldt);
         }
     } else {
         applyGearToLoadout(ldts[0], b.gear);

@@ -33,6 +33,47 @@ body {
 }
 
 /* ===================== TOP BAR ===================== */
+/* ===================== SITE HEADER ===================== */
+.site-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.site-logo {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+}
+
+a.site-title {
+    font-family: var(--font-ui);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+    text-decoration: none;
+}
+a.site-title:hover {
+    color: var(--accent-red);
+}
+
+.lang-select {
+    background: var(--bg-overlay);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
 .top-bar {
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border-subtle);
@@ -83,7 +124,8 @@ body {
     font-size: 15px;
     font-weight: 700;
     color: var(--text-primary);
-    min-width: 60px;
+    min-width: 24px;
+    text-align: center;
 }
 
 .top-field-sub {
@@ -778,6 +820,62 @@ body {
 .buff-stats-rarity-purple { background: rgba(156, 39, 176, 0.18) !important; }
 
 /* ===================== BATTLE SETTINGS ===================== */
+.bs-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+.bs-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--text-primary);
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 6px 8px;
+    min-width: 0;
+}
+.bs-item label {
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 12px;
+}
+.bs-item input[type="radio"],
+.bs-item input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--accent-red);
+}
+.bs-input {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--bg-main);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    padding: 3px 4px;
+    width: 52px;
+    min-width: 0;
+    text-align: center;
+}
+.bs-suffix {
+    font-size: 11px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+@media (max-width: 1024px) {
+    .bs-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
 .battle-settings-panel {
     background: var(--bg-raised);
     border: 1px solid var(--border-subtle);
@@ -2163,16 +2261,16 @@ body {
 .ht-legend-item {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     font-family: var(--font-ui);
     font-size: 9px;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     letter-spacing: 0.03em;
 }
 
 .ht-legend-dot {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 2px;
     flex-shrink: 0;
 }

@@ -186,24 +186,53 @@ function evalPhaseGear(skills, gear, ammoIdx, cfg, usePill, hp, initWDur, initAD
     const dmgPerRound = (1 - dodgeFrac) * 10 * (1 - armorTotal / (armorTotal + 40));
     const nHits       = dmgPerRound > 0 ? hp / dmgPerRound : 500;
 
-    // ─ Durability consumed (no cap — matches real sim: cost = nHits/100 * price) ─
+    // ─ Durability consumed ─
     const aDurUsed = nHits * (1 - dodgeFrac);
 
-    // ─ Gear + consumable cost (net of scrap gains) ─
-    const cps    = cfg.coinPerScrap || 0;   // cc per scrap gained
-    const wCost  = (nHits    / 100) * (RARITY_COSTS[wR]    - SCRAP_PER_RARITY[wR]    * cps);
-    const helmC  = (aDurUsed / 100) * (RARITY_COSTS[helmR]  - SCRAP_PER_RARITY[helmR]  * cps);
-    const chestC = (aDurUsed / 100) * (RARITY_COSTS[chestR] - SCRAP_PER_RARITY[chestR] * cps);
-    const pantsC = (aDurUsed / 100) * (RARITY_COSTS[pantsR] - SCRAP_PER_RARITY[pantsR] * cps);
-    const bootsC = (aDurUsed / 100) * (RARITY_COSTS[bootsR] - SCRAP_PER_RARITY[bootsR] * cps);
-    const glovC  = (aDurUsed / 100) * (RARITY_COSTS[glovR]  - SCRAP_PER_RARITY[glovR]  * cps);
+    // Total durability needed vs free carry-over from previous phase
+    // initWDur/initADur = free durability remaining from previous phase (0 = fresh, must pay all)
+    const wDurToPay = Math.max(0, nHits - initWDur);       // weapon dur that needs payment
+    const aDurToPay = Math.max(0, aDurUsed - initADur);    // armor dur that needs payment
+
+    // Gross cost (matches simulation display)
+    const wCost  = (wDurToPay / 100) * RARITY_COSTS[wR];
+    const helmC  = (aDurToPay / 100) * RARITY_COSTS[helmR];
+    const chestC = (aDurToPay / 100) * RARITY_COSTS[chestR];
+    const pantsC = (aDurToPay / 100) * RARITY_COSTS[pantsR];
+    const bootsC = (aDurToPay / 100) * RARITY_COSTS[bootsR];
+    const glovC  = (aDurToPay / 100) * RARITY_COSTS[glovR];
+
+    // Scrap gains (subtracted for net cost used in optimization)
+    const cps = cfg.coinPerScrap || 0;
+    const scrapGain = cps > 0 ? (
+        (wDurToPay / 100) * SCRAP_PER_RARITY[wR] * cps +
+        (aDurToPay / 100) * (SCRAP_PER_RARITY[helmR] + SCRAP_PER_RARITY[chestR] + SCRAP_PER_RARITY[pantsR] + SCRAP_PER_RARITY[bootsR] + SCRAP_PER_RARITY[glovR]) * cps
+    ) : 0;
     const ammoC  = nHits * AMMO_COST_HIT[ammoIdx];
     const pillC  = usePill ? (cfg.buffCosts ? cfg.buffCosts.pill : 35) : 0;
 
+    const wDurRemaining = nHits <= initWDur ? (initWDur - nHits) : (100 - ((nHits - initWDur) % 100)) % 100;
+    const aDurRemaining = aDurUsed <= initADur ? (initADur - aDurUsed) : (100 - ((aDurUsed - initADur) % 100)) % 100;
+
+    // Equipment cost = weapons + armor + food only (what you actually buy)
+    const gearCost = wCost + helmC + chestC + pantsC + bootsC + glovC;
+    // Full cost including consumables (ammo, pill)
+    const grossCost = gearCost + ammoC + pillC;
+    const damage = eDmg * nHits;
+
+    // Guard against NaN (can crash NSGA-II)
+    if (isNaN(damage) || isNaN(grossCost)) {
+        return { damage: 0, cost: 99999, netCost: 99999, nHits: 0, wDurRemaining: 0, aDurRemaining: 0, stats: {} };
+    }
+
     return {
-        damage: eDmg * nHits,
-        cost:   wCost + helmC + chestC + pantsC + bootsC + glovC + ammoC + pillC,
+        damage,
+        cost:      grossCost,           // full cost (matches simulation "Custo Total")
+        gearCost,                       // equipment only (weapons + armor, for budget filtering)
+        netCost:   grossCost - scrapGain, // net cost after scrap gains (used for NSGA-II)
         nHits,
+        wDurRemaining,
+        aDurRemaining,
         stats: {
             atk:            Math.round(atk),
             rawHitChance:   Math.round(50 + skills[1] * 5 + GLOVES_STAT[glovR]),
@@ -233,55 +262,60 @@ function evaluate(ind, cfg) {
     const ammoIdx = ind[ammoOff];
     const foodIdx = ind[foodOff];
 
-    let totalDmg = 0, totalCost = 0;
+    let totalDmg = 0, totalCost = 0, totalNetCost = 0, totalGearCost = 0;
 
     if (ph === 'all') {
-        const gearPre  = ind.slice(8,  14);
+        const gearPre   = ind.slice(8,  14);
         const gearBurst = ind.slice(14, 20);
         const gearSust  = ind.slice(20, 26);
 
-        // prePill — no pill, own fresh gear (no carry-over between sets)
+        // Each phase uses fresh armor, but weapons carry over if same rarity
+        function sameWeapon(a, b) { return a[0] === b[0]; }
+
         const hpPre = calcHP(skills, foodIdx, cfg.prePillHours || 6, true, rd);
-        const rPre  = evalPhaseGear(skills, gearPre,   ammoIdx, cfg, false, hpPre,  100, 100);
-        totalDmg += rPre.damage;   totalCost += rPre.cost;
+        const rPre  = evalPhaseGear(skills, gearPre, ammoIdx, cfg, false, hpPre, 0, 0);
+        totalDmg += rPre.damage; totalCost += rPre.cost; totalNetCost += rPre.netCost; totalGearCost += rPre.gearCost;
 
-        // burst — pill, own fresh gear
+        // Weapon carry-over: if same rarity, leftover dur transfers to next phase
+        const wCarryToBurst = sameWeapon(gearPre, gearBurst) ? rPre.wDurRemaining : 0;
         const hpBurst = calcHP(skills, foodIdx, 0, false, rd);
-        const rBurst  = evalPhaseGear(skills, gearBurst, ammoIdx, cfg, true, hpBurst, 100, 100);
-        totalDmg += rBurst.damage; totalCost += rBurst.cost;
+        const rBurst  = evalPhaseGear(skills, gearBurst, ammoIdx, cfg, true, hpBurst, wCarryToBurst, 0);
+        totalDmg += rBurst.damage; totalCost += rBurst.cost; totalNetCost += rBurst.netCost; totalGearCost += rBurst.gearCost;
 
-        // sustained — 1 fight (mirrors real simulation: each phase runs once per day)
+        const wCarryToSust = sameWeapon(gearBurst, gearSust) ? rBurst.wDurRemaining : 0;
         const hpSust = calcHP(skills, foodIdx, rd, true, rd);
-        const rSust  = evalPhaseGear(skills, gearSust, ammoIdx, cfg, true, hpSust, 100, 100);
-        totalDmg += rSust.damage; totalCost += rSust.cost;
+        const rSust  = evalPhaseGear(skills, gearSust, ammoIdx, cfg, true, hpSust, wCarryToSust, 0);
+        totalDmg += rSust.damage; totalCost += rSust.cost; totalNetCost += rSust.netCost; totalGearCost += rSust.gearCost;
     } else {
         const gear = ind.slice(8, 14);
-        let wDur = 100, aDur = 100;
 
         if (ph === 'prePill') {
             const hp = calcHP(skills, foodIdx, cfg.prePillHours || 6, true, rd);
-            const r  = evalPhaseGear(skills, gear, ammoIdx, cfg, false, hp, wDur, aDur);
-            totalDmg += r.damage; totalCost += r.cost;
+            const r  = evalPhaseGear(skills, gear, ammoIdx, cfg, false, hp, 0, 0);
+            totalDmg += r.damage; totalCost += r.cost; totalNetCost += r.netCost; totalGearCost += r.gearCost;
         } else if (ph === 'burst') {
             const hp = calcHP(skills, foodIdx, 0, false, rd);
-            const r  = evalPhaseGear(skills, gear, ammoIdx, cfg, true, hp, wDur, aDur);
-            totalDmg += r.damage; totalCost += r.cost;
+            const r  = evalPhaseGear(skills, gear, ammoIdx, cfg, true, hp, 0, 0);
+            totalDmg += r.damage; totalCost += r.cost; totalNetCost += r.netCost; totalGearCost += r.gearCost;
         } else if (ph === 'sustained') {
             const hp = calcHP(skills, foodIdx, rd, true, rd);
-            const r  = evalPhaseGear(skills, gear, ammoIdx, cfg, true, hp, wDur, aDur);
-            totalDmg += r.damage; totalCost += r.cost;
+            const r  = evalPhaseGear(skills, gear, ammoIdx, cfg, true, hp, 0, 0);
+            totalDmg += r.damage; totalCost += r.cost; totalNetCost += r.netCost; totalGearCost += r.gearCost;
         }
     }
 
-    // Food consumed once per battle day
-    totalCost += FOOD_COST[foodIdx];
-    return { damage: totalDmg, cost: totalCost };
+    // Food consumed once per battle day — counts as gear cost (you buy it)
+    const foodC = FOOD_COST[foodIdx];
+    totalCost += foodC;
+    totalNetCost += foodC;
+    totalGearCost += foodC;
+    return { damage: totalDmg, cost: totalCost, netCost: totalNetCost, gearCost: totalGearCost };
 }
 
 // ── NSGA-II ──────────────────────────────────────────────────────────────────
 function dominates(a, b) {
-    return a.damage >= b.damage && a.cost <= b.cost &&
-           (a.damage > b.damage || a.cost < b.cost);
+    return a.damage >= b.damage && a.netCost <= b.netCost &&
+           (a.damage > b.damage || a.netCost < b.netCost);
 }
 
 function nonDominatedSort(pop) {
@@ -313,7 +347,7 @@ function crowdingDistance(front, pop) {
     for (const i of front) pop[i].crowding = 0;
     if (m <= 2) { for (const i of front) pop[i].crowding = Infinity; return; }
     for (let obj = 0; obj < 2; obj++) {
-        const key = obj === 0 ? 'damage' : 'cost';
+        const key = obj === 0 ? 'damage' : 'netCost';
         const sorted = [...front].sort((a, b) => pop[a][key] - pop[b][key]);
         pop[sorted[0]].crowding = Infinity;
         pop[sorted[m - 1]].crowding = Infinity;
@@ -362,8 +396,8 @@ function nsga2(cfg) {
     let pop = [];
     for (let i = 0; i < popSize; i++) {
         const ind = randomInd(level, pinned, phase);
-        const { damage, cost } = evaluate(ind, cfg);
-        pop.push({ ind, damage, cost, rank: 0, crowding: 0 });
+        const ev = evaluate(ind, cfg);
+        pop.push({ ind, damage: ev.damage, cost: ev.cost, netCost: ev.netCost, gearCost: ev.gearCost, rank: 0, crowding: 0 });
     }
 
     for (let gen = 0; gen < nGen; gen++) {
@@ -381,8 +415,8 @@ function nsga2(cfg) {
                 ? crossover(p1, p2, level, pinned, phase)
                 : [...p1.ind];
             if (Math.random() < 0.35) childInd = mutate(childInd, level, pinned, phase);
-            const { damage, cost } = evaluate(childInd, cfg);
-            offspring.push({ ind: childInd, damage, cost, rank: 0, crowding: 0 });
+            const ev = evaluate(childInd, cfg);
+            offspring.push({ ind: childInd, damage: ev.damage, cost: ev.cost, netCost: ev.netCost, gearCost: ev.gearCost, rank: 0, crowding: 0 });
         }
 
         const combined = [...pop, ...offspring];
@@ -440,6 +474,7 @@ function buildResult(p, phase, cfg) {
         ind:      p.ind,
         damage:   p.damage,
         cost:     p.cost,
+        gearCost: p.gearCost,
         skills: {
             attack: p.ind[0], precision: p.ind[1], critChance: p.ind[2], critDamage: p.ind[3],
             armor:  p.ind[4], dodge:     p.ind[5], health:     p.ind[6], hunger:     p.ind[7]
@@ -455,9 +490,13 @@ function buildResult(p, phase, cfg) {
         const hpPre   = calcHP(skills, foodIdx, cfg.prePillHours || 6, true, rd);
         const hpBurst = calcHP(skills, foodIdx, 0, false, rd);
         const hpSust  = calcHP(skills, foodIdx, rd, true, rd);
-        const rPre   = evalPhaseGear(skills, p.ind.slice(8,  14), ammoIdx, cfg, false, hpPre,   100, 100);
-        const rBurst = evalPhaseGear(skills, p.ind.slice(14, 20), ammoIdx, cfg, true,  hpBurst, 100, 100);
-        const rSust  = evalPhaseGear(skills, p.ind.slice(20, 26), ammoIdx, cfg, true,  hpSust,  100, 100);
+        const gPre   = p.ind.slice(8, 14), gBurst = p.ind.slice(14, 20), gSust = p.ind.slice(20, 26);
+        function sameW(a, b) { return a[0] === b[0]; }
+        const rPre   = evalPhaseGear(skills, gPre,   ammoIdx, cfg, false, hpPre, 0, 0);
+        const rBurst = evalPhaseGear(skills, gBurst, ammoIdx, cfg, true,  hpBurst,
+            sameW(gPre, gBurst) ? rPre.wDurRemaining : 0, 0);
+        const rSust  = evalPhaseGear(skills, gSust,  ammoIdx, cfg, true,  hpSust,
+            sameW(gBurst, gSust) ? rBurst.wDurRemaining : 0, 0);
         base.gearPrePill   = gearInfo(p.ind.slice(8,  14));
         base.gearBurst     = gearInfo(p.ind.slice(14, 20));
         base.gearSustained = gearInfo(p.ind.slice(20, 26));
@@ -472,7 +511,7 @@ function buildResult(p, phase, cfg) {
         if (phase === 'prePill')   { hp = calcHP(skills, foodIdx, cfg.prePillHours || 6, true, rd); usePill = false; }
         else if (phase === 'burst'){ hp = calcHP(skills, foodIdx, 0, false, rd); usePill = true; }
         else                       { hp = calcHP(skills, foodIdx, rd, true, rd); usePill = true; }
-        const r = evalPhaseGear(skills, gear, ammoIdx, cfg, usePill, hp, 100, 100);
+        const r = evalPhaseGear(skills, gear, ammoIdx, cfg, usePill, hp, 0, 0);
         base.gear      = gearInfo(gear);
         base.phaseStats = { [phase]: { ...r.stats, damage: Math.round(r.damage), cost: +r.cost.toFixed(1) } };
     }
@@ -480,13 +519,26 @@ function buildResult(p, phase, cfg) {
 }
 
 // ── Message handler ──────────────────────────────────────────────────────────
-self.onmessage = function (e) {
-    if (e.data.type === 'start') {
-        try {
-            const pareto = nsga2(e.data.config);
-            postMessage({ type: 'result', pareto });
-        } catch (err) {
-            postMessage({ type: 'error', message: err.message });
+if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
+    self.onmessage = function (e) {
+        if (e.data.type === 'start') {
+            try {
+                const pareto = nsga2(e.data.config);
+                postMessage({ type: 'result', pareto });
+            } catch (err) {
+                postMessage({ type: 'error', message: err.message });
+            }
         }
-    }
-};
+    };
+}
+
+// ── Node.js exports for testing ─────────────────────────────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        evalPhaseGear, evaluate, calcHP, buildResult, gearInfo,
+        WEAPON_PRIMARY, WEAPON_SECONDARY,
+        HELMET_STAT, CHEST_STAT, PANTS_STAT, BOOTS_STAT, GLOVES_STAT,
+        RARITY_COSTS, SCRAP_PER_RARITY, RARITY_NAMES,
+        AMMO_BONUS, AMMO_COST_HIT, FOOD_BONUS, FOOD_COST, FOOD_NAMES, AMMO_NAMES
+    };
+}
