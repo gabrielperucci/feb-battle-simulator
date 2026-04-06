@@ -167,17 +167,21 @@ function evalPhaseGear(skills, gear, ammoIdx, cfg, usePill, hp, initWDur, initAD
     if (ammoIdx > 0) atk *= (1 + AMMO_BONUS[ammoIdx] / 100);
     if (cfg.militaryRankBonus > 0) atk *= (1 + cfg.militaryRankBonus / 100);
 
+    // Precision overflow: added AFTER all multipliers (matches simulation determineDamage)
     let hitChance = 50 + skills[1] * 5 + GLOVES_STAT[glovR];
-    if (hitChance > 100) { atk += (hitChance - 100) * 4; hitChance = 100; }
+    let precOverflowFlat = 0;
+    if (hitChance > 100) { precOverflowFlat = (hitChance - 100) * 4; hitChance = 100; }
 
     let critChance = 10 + skills[2] * 5 + WEAPON_SECONDARY[wR];
     let critOverflow = 0;
     if (critChance > 100) { critOverflow = (critChance - 100) * 4; critChance = 100; }
     const critDmgPct = 100 + skills[3] * 20 + HELMET_STAT[helmR] + critOverflow;
 
+    // dmg = atk + precOverflowFlat (overflow added after multipliers, before hit/crit roll)
+    const dmg = atk + precOverflowFlat;
     const hc = hitChance / 100;
     const cc = critChance / 100;
-    const eDmg = hc * (cc * atk * (1 + critDmgPct / 100) + (1 - cc) * atk) + (1 - hc) * atk / 2;
+    const eDmg = hc * (cc * dmg * (1 + critDmgPct / 100) + (1 - cc) * dmg) + (1 - hc) * dmg / 2;
 
     // ─ Defense ─
     const dodgeTotal  = skills[5] * 4 + BOOTS_STAT[bootsR];
@@ -378,13 +382,17 @@ function crossover(p1, p2, level, pinned, phase) {
 function mutate(ind, level, pinned, phase) {
     const child = [...ind];
     const n = child.length;
-    const i = Math.floor(Math.random() * n);
-    if (i < 8) {
-        child[i] = Math.floor(Math.random() * 11);
-    } else if (i < n - 2) {
-        child[i] = Math.floor(Math.random() * 6); // gear
-    } else {
-        child[i] = Math.floor(Math.random() * 4); // ammo/food
+    // 25% chance to mutate 2 slots (more aggressive exploration)
+    const numMutations = Math.random() < 0.25 ? 2 : 1;
+    for (let m = 0; m < numMutations; m++) {
+        const i = Math.floor(Math.random() * n);
+        if (i < 8) {
+            child[i] = Math.floor(Math.random() * 11);
+        } else if (i < n - 2) {
+            child[i] = Math.floor(Math.random() * 6); // gear
+        } else {
+            child[i] = Math.floor(Math.random() * 4); // ammo/food
+        }
     }
     repairSkills(child, level, pinned);
     applyPinned(child, pinned, phase);
@@ -400,6 +408,36 @@ function nsga2(cfg) {
         const ind = randomInd(level, pinned, phase);
         const ev = evaluate(ind, cfg);
         pop.push({ ind, damage: ev.damage, cost: ev.cost, netCost: ev.netCost, gearCost: ev.gearCost, rank: 0, crowding: 0 });
+    }
+
+    // Inject seed builds to ensure exploration of high-overflow gloves and high-rarity weapons
+    // Seeds: 5% with maxed gloves, 5% with maxed weapons, 5% all-red gear
+    const seedCount = Math.max(3, Math.floor(popSize * 0.05));
+    const gearSlots = phase === 'all' ? [8, 14, 20] : [8];
+    const replaceIdxs = (rarity, slotOffsets) => {
+        const ind = randomInd(level, pinned, phase);
+        for (const off of gearSlots) {
+            for (const slot of slotOffsets) ind[off + slot] = rarity;
+        }
+        return ind;
+    };
+    // Seed 1: maxed gloves (slot 5 = gloves index)
+    for (let i = 0; i < seedCount; i++) {
+        const ind = replaceIdxs(5, [5]); // gloves slot
+        const ev = evaluate(ind, cfg);
+        pop[i] = { ind, damage: ev.damage, cost: ev.cost, netCost: ev.netCost, gearCost: ev.gearCost, rank: 0, crowding: 0 };
+    }
+    // Seed 2: maxed weapon + gloves
+    for (let i = seedCount; i < seedCount * 2; i++) {
+        const ind = replaceIdxs(5, [0, 5]); // weapon + gloves
+        const ev = evaluate(ind, cfg);
+        pop[i] = { ind, damage: ev.damage, cost: ev.cost, netCost: ev.netCost, gearCost: ev.gearCost, rank: 0, crowding: 0 };
+    }
+    // Seed 3: all red gear
+    for (let i = seedCount * 2; i < seedCount * 3; i++) {
+        const ind = replaceIdxs(5, [0, 1, 2, 3, 4, 5]);
+        const ev = evaluate(ind, cfg);
+        pop[i] = { ind, damage: ev.damage, cost: ev.cost, netCost: ev.netCost, gearCost: ev.gearCost, rank: 0, crowding: 0 };
     }
 
     for (let gen = 0; gen < nGen; gen++) {
