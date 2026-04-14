@@ -921,14 +921,27 @@ function runMultiStageSimulation() {
     // Always run multiple iterations for realistic averages (min 10k)
     const iterations  = Math.max(battleCount, 10000);
 
-    const PHASES = ['prePill', 'burst', 'sustained'];
+    // Skip prePill phase when user has disabled it (even if items are still assigned to it)
+    const prePillEnabled = !!state.battle.prePillPhaseEnabled;
+    const PHASES = prePillEnabled
+        ? ['prePill', 'burst', 'sustained']
+        : ['burst', 'sustained'];
+
+    // When prePill is disabled, items assigned only to prePill fall through to burst
+    // (so the user's existing loadouts still get used in the remaining phases)
+    const effectivePhases = (item) => {
+        const phs = getItemPhases(item);
+        if (prePillEnabled) return phs;
+        if (phs.includes('burst') || phs.includes('sustained')) return phs.filter(p => p !== 'prePill');
+        return ['burst']; // prePill-only item → run it in burst
+    };
 
     // For each phase, get which item indices appear in it (by global index)
     const phaseWeaponIdxs  = {};
     const phaseLoadoutIdxs = {};
     PHASES.forEach(ph => {
-        phaseWeaponIdxs[ph]  = allWeapons.map((w, i) => getItemPhases(w).includes(ph) ? i : -1).filter(i => i >= 0);
-        phaseLoadoutIdxs[ph] = allLoadouts.map((l, i) => getItemPhases(l).includes(ph) ? i : -1).filter(i => i >= 0);
+        phaseWeaponIdxs[ph]  = allWeapons.map((w, i) => effectivePhases(w).includes(ph) ? i : -1).filter(i => i >= 0);
+        phaseLoadoutIdxs[ph] = allLoadouts.map((l, i) => effectivePhases(l).includes(ph) ? i : -1).filter(i => i >= 0);
     });
 
     // Per-phase per-item accumulators (indexed by position within phase)
@@ -3070,6 +3083,7 @@ function updateHealthTrail() {
     const hungerCap = calculateStats.hunger(state.skills.hunger);
     const hpPerHour = baseHP * 0.1;
     const hungerPerHour = hungerCap * 0.1;
+    const prePillEnabled = !!state.battle.prePillPhaseEnabled;
     const prePillHours = state.battle.prePillPhaseHours || 6;
 
     // Food: read from first loadout
@@ -3137,6 +3151,7 @@ function updateHealthTrail() {
     </div>
     <div class="ht-timeline">
 
+        ${prePillEnabled ? `
         <div class="ht-step">
             <div class="ht-step-label">0h <span class="ht-tag ht-tag-neutral">${t('hp.zeroed')}</span></div>
             ${hpBar(baseHP, foodHpPerUnit * hungerCap, fullHp)}
@@ -3172,6 +3187,20 @@ function updateHealthTrail() {
             <div class="ht-budget-val">${totalHpAtPill} <span class="ht-budget-unit">${t('hp.hpToSpend')}</span></div>
             <div class="ht-budget-note">${hpPctAtPill}% ${t('hp.ofMax')}${pillReached ? ` — ${t('hp.alreadyFullShort')}` : ` — ${fullHp - totalHpAtPill} ${t('hp.notRecovered')}`}</div>
         </div>
+        ` : `
+        <div class="ht-step ht-step-pill">
+            <div class="ht-step-label">0h <span class="ht-tag ht-tag-pill">${t('hp.takePill')}</span></div>
+            ${hpBar(baseHP, foodHpPerUnit * hungerCap, fullHp)}
+            ${hungerDots(hungerCap, hungerCap)}
+            <div class="ht-step-nums">${fullHp} / ${fullHp} HP (100%) &nbsp;·&nbsp; ${hungerCap} / ${hungerCap} ${t('hp.hunger')} (100%)</div>
+        </div>
+
+        <div class="ht-energy-budget ht-energy-burst">
+            <div class="ht-budget-label">${t('hp.energyBurst')}</div>
+            <div class="ht-budget-val">${fullHp} <span class="ht-budget-unit">${t('hp.hpToSpend')}</span></div>
+            <div class="ht-budget-note">100% ${t('hp.ofMax')}</div>
+        </div>
+        `}
 
         <div class="ht-connector">
             <span class="ht-connector-line"></span>
@@ -3179,7 +3208,7 @@ function updateHealthTrail() {
         </div>
 
         <div class="ht-step">
-            <div class="ht-step-label">${prePillHours + sustainHours}h <span class="ht-tag ht-tag-neutral">${t('hp.sustained')}</span></div>
+            <div class="ht-step-label">${(prePillEnabled ? prePillHours : 0) + sustainHours}h <span class="ht-tag ht-tag-neutral">${t('hp.sustained')}</span></div>
             ${hpBar(hpBaseSustain, foodHpSustain, fullHp)}
             ${hungerDots(hungerSustain, hungerCap)}
             <div class="ht-step-nums">${totalHpSustain} / ${fullHp} HP (${Math.round(totalHpSustain / fullHp * 100)}%) &nbsp;·&nbsp; ${hungerSustain} / ${hungerCap} ${t('hp.hunger')}</div>
@@ -4141,6 +4170,7 @@ function runOptimizer() {
         militaryRankBonus: state.militaryRankBonus || 0,
         battleBonusPct:   state.bonuses ? (state.bonuses.direct || 0) : 0,
         prePillHours:     state.battle ? (state.battle.prePillPhaseHours || 6) : 6,
+        prePillEnabled:   state.battle ? !!state.battle.prePillPhaseEnabled : false,
         roundDuration:    state.battle ? (state.battle.roundDuration || 8) : 8,
         phase:            document.getElementById('optPhase').value,
         mode:             _optMode,
@@ -4233,7 +4263,7 @@ function renderOptimizerResults(pareto, cfg) {
 
         const gearSection = b.multiPhase
             ? `<div class="opt-multiphase-gear">
-                   <div class="opt-phase-section">${gearBlock(b.gearPrePill, t('phase.prePill'))}</div>
+                   ${b.gearPrePill ? `<div class="opt-phase-section">${gearBlock(b.gearPrePill, t('phase.prePill'))}</div>` : ''}
                    <div class="opt-phase-section">${gearBlock(b.gearBurst, t('phase.burst'))}</div>
                    <div class="opt-phase-section">${gearBlock(b.gearSustained, t('phase.sustained'))}</div>
                </div>`
@@ -4403,7 +4433,7 @@ function applyOptimizerBuild(index) {
             { key: 'prePill',   gear: b.gearPrePill,   pill: false },
             { key: 'burst',     gear: b.gearBurst,     pill: true  },
             { key: 'sustained', gear: b.gearSustained, pill: true  }
-        ];
+        ].filter(pg => pg.gear); // skip prePill when disabled (gearPrePill undefined)
 
         // --- Weapons: per phase, with shared boundary weapon when consecutive phases use same rarity ---
         // First pass: compute carry-over per phase using optimizer stats

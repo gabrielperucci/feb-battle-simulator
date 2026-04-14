@@ -278,12 +278,17 @@ function evaluate(ind, cfg) {
         // Each phase uses fresh armor, but weapons carry over if same rarity
         function sameWeapon(a, b) { return a[0] === b[0]; }
 
-        const hpPre = calcHP(skills, foodIdx, cfg.prePillHours || 6, true, rd);
-        const rPre  = evalPhaseGear(skills, gearPre, ammoIdx, cfg, false, hpPre, 0, 0);
-        totalDmg += rPre.damage; totalCost += rPre.cost; totalNetCost += rPre.netCost; totalGearCost += rPre.gearCost;
+        // prePill phase is optional — skipped entirely when disabled by user
+        const prePillOn = cfg.prePillEnabled !== false;
+        let rPre = { damage: 0, cost: 0, netCost: 0, gearCost: 0, wDurRemaining: 0 };
+        if (prePillOn) {
+            const hpPre = calcHP(skills, foodIdx, cfg.prePillHours || 6, true, rd);
+            rPre = evalPhaseGear(skills, gearPre, ammoIdx, cfg, false, hpPre, 0, 0);
+            totalDmg += rPre.damage; totalCost += rPre.cost; totalNetCost += rPre.netCost; totalGearCost += rPre.gearCost;
+        }
 
         // Weapon carry-over: if same rarity, leftover dur transfers to next phase
-        const wCarryToBurst = sameWeapon(gearPre, gearBurst) ? rPre.wDurRemaining : 0;
+        const wCarryToBurst = prePillOn && sameWeapon(gearPre, gearBurst) ? rPre.wDurRemaining : 0;
         const hpBurst = calcHP(skills, foodIdx, 0, false, rd);
         const rBurst  = evalPhaseGear(skills, gearBurst, ammoIdx, cfg, true, hpBurst, wCarryToBurst, 0);
         totalDmg += rBurst.damage; totalCost += rBurst.cost; totalNetCost += rBurst.netCost; totalGearCost += rBurst.gearCost;
@@ -527,24 +532,30 @@ function buildResult(p, phase, cfg) {
     };
 
     if (phase === 'all') {
-        const hpPre   = calcHP(skills, foodIdx, cfg.prePillHours || 6, true, rd);
+        const prePillOn = cfg.prePillEnabled !== false;
         const hpBurst = calcHP(skills, foodIdx, 0, false, rd);
         const hpSust  = calcHP(skills, foodIdx, rd, true, rd);
         const gPre   = p.ind.slice(8, 14), gBurst = p.ind.slice(14, 20), gSust = p.ind.slice(20, 26);
         function sameW(a, b) { return a[0] === b[0]; }
-        const rPre   = evalPhaseGear(skills, gPre,   ammoIdx, cfg, false, hpPre, 0, 0);
+        let rPre = { damage: 0, cost: 0, wDurRemaining: 0, stats: {} };
+        if (prePillOn) {
+            const hpPre = calcHP(skills, foodIdx, cfg.prePillHours || 6, true, rd);
+            rPre = evalPhaseGear(skills, gPre, ammoIdx, cfg, false, hpPre, 0, 0);
+        }
         const rBurst = evalPhaseGear(skills, gBurst, ammoIdx, cfg, true,  hpBurst,
-            sameW(gPre, gBurst) ? rPre.wDurRemaining : 0, 0);
+            prePillOn && sameW(gPre, gBurst) ? rPre.wDurRemaining : 0, 0);
         const rSust  = evalPhaseGear(skills, gSust,  ammoIdx, cfg, true,  hpSust,
             sameW(gBurst, gSust) ? rBurst.wDurRemaining : 0, 0);
-        base.gearPrePill   = gearInfo(p.ind.slice(8,  14));
+        if (prePillOn) base.gearPrePill = gearInfo(p.ind.slice(8, 14));
         base.gearBurst     = gearInfo(p.ind.slice(14, 20));
         base.gearSustained = gearInfo(p.ind.slice(20, 26));
         base.phaseStats = {
-            prePill:   { ...rPre.stats,   damage: Math.round(rPre.damage),   cost: +rPre.cost.toFixed(1) },
             burst:     { ...rBurst.stats, damage: Math.round(rBurst.damage), cost: +rBurst.cost.toFixed(1) },
             sustained: { ...rSust.stats,  damage: Math.round(rSust.damage),  cost: +rSust.cost.toFixed(1) }
         };
+        if (prePillOn) {
+            base.phaseStats.prePill = { ...rPre.stats, damage: Math.round(rPre.damage), cost: +rPre.cost.toFixed(1) };
+        }
     } else {
         const gear = p.ind.slice(8, 14);
         let hp, usePill;
